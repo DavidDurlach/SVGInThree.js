@@ -1,0 +1,311 @@
+/* Global Styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
+    background-color: #f9fafb;
+    padding: 20px;
+    height: 100vh;
+    overflow: hidden; /* Prevent body scrolling */
+}
+
+#app-container {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    gap: 0;
+}
+
+#viewport-area {
+    position: relative; /* For positioning the stop button */
+    background: #ddd;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    overflow: hidden; /* Hide anything that might spill out */
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+}
+
+#threejs-mount {
+    width: 100%;
+    flex: 1; /* Take up remaining space after stop-row */
+    position: relative;
+    display: block;
+    min-height: 0; /* Important for flex children */
+}
+
+/* Ensure canvas displays properly */
+#threejs-mount canvas {
+    display: block;
+}
+
+#ui-overlay {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    bottom: 20px;
+    left: 20px;
+    pointer-events: none; /* Allows clicks to pass through to the canvas */
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    grid-template-rows: 1fr auto; /* Rows for main content and bottom bar */
+    gap: 16px;
+}
+
+/* Make UI elements clickable again */
+#controls-panel, .stop-row button, .stop-row small {
+    pointer-events: auto;
+}
+
+/* Main Container Layout */
+.main-container {
+    display: contents; /* Use the parent grid from ui-overlay */
+}
+
+.main-container.no-ui {
+    display: block;
+}
+
+/* Viewport Container */
+.viewport-container {
+    background: transparent; /* No longer needs its own background */
+    border-radius: 16px;
+    box-shadow: none;
+    overflow: visible;
+    grid-column: 1 / 2;
+    grid-row: 1 / 3; /* Span both rows */
+    position: relative; /* For positioning stop-row */
+}
+
+.threejs-canvas {
+    /* threejs-mount now handles sizing, this class is not needed for layout */
+    width: 100%;
+    height: 70vh;
+}
+
+/* Stop Button Row */
+.stop-row {
+    position: relative;
+    display: flex; /* keep the button and text aligned */
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    padding: 8px;
+    text-align: center;
+    flex-shrink: 0; /* Prevent from being squeezed */
+    background: #ddd;
+}
+
+.stop-button {
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #111;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.stop-button[aria-pressed="true"] {
+    background: #e5e7eb;
+    color: #6b7280;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.stop-button:hover {
+    background: #f9fafb;
+}
+
+.hint-text {
+    color: #6b7280;
+    line-height: 1.2;
+}
+
+/* Controls Panel */
+.controls-panel {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto; /* Allow controls to scroll if content is too tall */
+    border-left: 1px solid #e5e7eb;
+}
+
+.controls-panel.hidden {
+    display: none;
+}
+
+.controls-panel h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.controls-panel h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin: 8px 0 4px;
+}
+
+.controls-panel hr {
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 8px 0;
+}
+
+/* Control Groups */
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.control-group label {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.control-group input[type="range"] {
+    width: 100%;
+    cursor: pointer;
+}
+
+.control-group input[type="color"] {
+    width: 100%;
+    height: 32px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.control-group select {
+    width: 100%;
+    padding: 6px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    cursor: pointer;
+}
+
+.control-group small {
+    color: #6b7280;
+    font-size: 11px;
+}
+
+.control-group textarea {
+    width: 100%;
+    height: 160px;
+    padding: 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    font-family: monospace;
+    font-size: 12px;
+    resize: vertical;
+}
+
+/* Checkbox Styling */
+.control-group input[type="checkbox"] {
+    margin-right: 6px;
+    cursor: pointer;
+}
+
+/* Button Groups */
+.button-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.button-group button,
+.controls-panel button {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #111;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.button-group button:hover,
+.controls-panel button:hover {
+    background: #f9fafb;
+}
+
+.button-group button:active,
+.controls-panel button:active {
+    background: #e5e7eb;
+}
+
+/* VSM Controls Visibility */
+#vsm-controls {
+    display: block;
+}
+
+#vsm-controls.hidden {
+    display: none;
+}
+
+/* Scrollbar Styling */
+.controls-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.controls-panel::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.controls-panel::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+.controls-panel::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    #app-container {
+        grid-template-columns: 1fr; /* single column */
+        grid-template-rows: 2fr 1fr; /* viewport gets 2/3 of the height */
+    }
+    
+    .controls-panel {
+        max-height: none;
+    }
+}
+
+@media (max-width: 640px) {
+    #ui-overlay {
+        top: 10px;
+        right: 10px;
+        bottom: 10px;
+        left: 10px;
+    }
+
+    body {
+        padding: 10px;
+    }
+
+    .stop-row {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .hint-text {
+        font-size: 11px;
+    }
+}

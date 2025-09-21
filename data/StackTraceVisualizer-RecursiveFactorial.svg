@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<svg width="1874" height="454" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <polygon points="4,450 4,4 1870,4 1870,450 4,450" stroke-opacity="0.000000" stroke="#fffffe" fill-opacity="0.000000" fill="#fffffe"/>
+ <polygon points="188,117 4,117 4,170 194,170 194,123 188,117" stroke="#000000" fill="#ffe4b5"/>
+ <polyline points="188,117 188,123" stroke="#000000" fill="none"/>
+ <polyline points="194,123 188,123" stroke="#000000" fill="none"/>
+ <text x="59" y="130" fill="#000000" font-family="Arial" font-size="10">Stack Trace 1</text>
+ <text x="12" y="145" fill="#000000" font-family="Arial" font-size="10">recursive_factorial_TRACE.txt</text>
+ <text x="40" y="160" fill="#000000" font-family="Arial" font-size="10">(Group 2 - Complex)</text>
+ <polygon points="442,95 267,95 267,193 448,193 448,101 442,95" stroke="#c0c0c0" fill="#f0f0f0"/>
+ <polyline points="442,95 442,101" stroke="#c0c0c0" fill="none"/>
+ <polyline points="448,101 442,101" stroke="#c0c0c0" fill="none"/>
+ <text x="296" y="108" fill="#666666" font-family="Arial" font-size="10">Init/System Functions</text>
+ <text x="329" y="123" fill="#666666" font-family="Arial" font-size="10">(4 filtered)</text>
+ <text x="306" y="138" fill="#666666" font-family="Arial" font-size="10">• mainCRTStartup</text>
+ <text x="290" y="153" fill="#666666" font-family="Arial" font-size="10">• __scrt_common_main</text>
+ <text x="276" y="168" fill="#666666" font-family="Arial" font-size="10">• __scrt_common_main_seh</text>
+ <text x="314" y="183" fill="#666666" font-family="Arial" font-size="10">• ... and 1 more</text>
+ <path d="M 194 144 C 215 144, 236 144, 257 144" stroke="#cd853f" fill="none"/>
+ <polygon points="267,144 257,139 262,144 257,144 257,144 257,144 262,144 257,148 267,144" stroke="#cd853f" fill="#cd853f"/>
+ <polygon points="693,126 639,126 639,162 693,162 693,126" stroke="#006400" fill="none"/>
+ <text x="653" y="145" fill="#000000" font-family="Arial" font-size="9">main</text>
+ <path d="M 448 144 C 508 144, 584 144, 628 144" stroke="#c0c0c0" fill="none"/>
+ <text x="485" y="136" fill="#000000" font-family="Arial" font-size="9">init/system call (db❌)</text>
+ <polygon points="628,140 638,144 628,147 628,140" stroke="#c0c0c0" fill="#c0c0c0"/>
+ <polygon points="955,126 873,126 873,162 955,162 955,126" stroke="#006400" fill="none"/>
+ <text x="881" y="145" fill="#000000" font-family="Arial" font-size="9">testFactorial</text>
+ <path d="M 693 144 C 733 144, 810 144, 862 144" stroke="#0000ff" fill="none"/>
+ <text x="730" y="138" fill="#000000" font-family="Arial" font-size="10">trace (db✓)</text>
+ <polygon points="862,140 872,144 862,147 862,140" stroke="#0000ff" fill="#0000ff"/>
+ <polygon points="994,198 834,198 834,234 994,234 994,198" stroke="#c0c0c0" fill="#d3d3d3"/>
+ <text x="842" y="217" fill="#000000" font-family="Arial" font-size="9">basic_ostream::operator&lt;&lt;</text>
+ <path d="M 693 155 C 704 159, 717 164, 729 168 C 760 178, 794 187, 825 195" stroke="#c0c0c0" fill="none"/>
+ <text x="743" y="162" fill="#000000" font-family="Arial" font-size="10">(sib x2)</text>
+ <polygon points="825,192 834,198 824,198 825,192" stroke="#c0c0c0" fill="#c0c0c0"/>
+ <polygon points="963,270 865,270 865,306 963,306 963,270" stroke="#c0c0c0" fill="#d3d3d3"/>
+ <text x="873" y="289" fill="#000000" font-family="Arial" font-size="9">std::operator&lt;&lt;</text>
+ <path d="M 680 162 C 691 177, 709 198, 729 212 C 768 239, 817 259, 855 271" stroke="#c0c0c0" fill="none"/>
+ <text x="743" y="206" fill="#000000" font-family="Arial" font-size="10">(sib x2)</text>
+ <polygon points="856,268 865,275 854,275 856,268" stroke="#c0c0c0" fill="#c0c0c0"/>
+ <polygon points="945,342 883,342 883,378 945,378 945,342" stroke="#c0c0c0" fill="#d3d3d3"/>
+ <text x="891" y="361" fill="#000000" font-family="Arial" font-size="9">std::endl</text>
+ <path d="M 672 162 C 679 189, 697 241, 729 273 C 770 314, 833 338, 873 350" stroke="#c0c0c0" fill="none"/>
+ <text x="743" y="267" fill="#000000" font-family="Arial" font-size="10">(sib x2)</text>
+ <polygon points="874,346 883,353 872,353 874,346" stroke="#c0c0c0" fill="#c0c0c0"/>
+ <polygon points="1244,126 1186,126 1186,162 1244,162 1244,126" stroke="#006400" fill="none"/>
+ <text x="1194" y="145" fill="#000000" font-family="Arial" font-size="9">factorial</text>
+ <path d="M 955 144 C 1013 144, 1118 144, 1175 144" stroke="#0000ff" fill="none"/>
+ <text x="1031" y="138" fill="#000000" font-family="Arial" font-size="10">trace (db✓)</text>
+ <polygon points="1175,140 1185,144 1175,147 1175,140" stroke="#0000ff" fill="#0000ff"/>
+ <polygon points="1295,198 1135,198 1135,234 1295,234 1295,198" stroke="#c0c0c0" fill="#d3d3d3"/>
+ <text x="1143" y="217" fill="#000000" font-family="Arial" font-size="9">basic_ostream::operator&lt;&lt;</text>
+ <path d="M 955 154 C 999 164, 1071 182, 1128 195" stroke="#c0c0c0" fill="none"/>
+ <text x="1044" y="168" fill="#000000" font-family="Arial" font-size="10">(sib x6)</text>
+ <polygon points="1128,192 1137,198 1127,199 1128,192" stroke="#c0c0c0" fill="#c0c0c0"/>
+ <polygon points="1264,270 1166,270 1166,306 1264,306 1264,270" stroke="#c0c0c0" fill="#d3d3d3"/>
+ <text x="1174" y="289" fill="#000000" font-family="Arial" font-size="9">std::operator&lt;&lt;</text>
+ <path d="M 955 160 C 968 165, 982 172, 994 180 C 1012 191, 1012 200, 1030 211 C 1070 236, 1119 256, 1157 269" stroke="#c0c0c0" fill="none"/>
+ <text x="1044" y="205" fill="#000000" font-family="Arial" font-size="10">(sib x6)</text>
+ <polygon points="1158,266 1166,273 1155,273 1158,266" stroke="#c0c0c0" fill="#c0c0c0"/>
+ <polygon points="1276,342 1154,342 1154,378 1276,378 1276,342" stroke="#c0c0c0" fill="#d3d3d3"/>
+ <text x="1162" y="361" fill="#000000" font-family="Arial" font-size="9">std::exception::what</text>
+ <path d="M 955 155 C 969 161, 984 169, 994 180 C 1024 212, 1001 239, 1030 271 C 1065 310, 1088 301, 1135 324 C 1144 328, 1154 333, 1164 337" stroke="#c0c0c0" fill="none"/>
+ <text x="1052" y="265" fill="#000000" font-family="Arial" font-size="10">(sib)</text>
+ <polygon points="1165,334 1173,342 1162,341 1165,334" stroke="#c0c0c0" fill="#c0c0c0"/>
+ <polygon points="1246,414 1184,414 1184,450 1246,450 1246,414" stroke="#c0c0c0" fill="#d3d3d3"/>
+ <text x="1192" y="433" fill="#000000" font-family="Arial" font-size="9">std::endl</text>
+ <path d="M 955 154 C 969 160, 984 168, 994 180 C 1039 234, 988 277, 1030 334 C 1065 382, 1132 409, 1174 422" stroke="#c0c0c0" fill="none"/>
+ <text x="1044" y="328" fill="#000000" font-family="Arial" font-size="10">(sib x3)</text>
+ <polygon points="1175,419 1184,425 1173,425 1175,419" stroke="#c0c0c0" fill="#c0c0c0"/>
+ <path d="M 1207 126 C 1203 109, 1206 90, 1215 90 C 1222 90, 1225 102, 1224 115" stroke="#00008b" stroke-width="2" fill="none"/>
+ <text x="1185" y="84" fill="#000000" font-family="Arial" font-size="9">recursion 1</text>
+ <polygon points="1228,114 1223,124 1221,113 1228,114" stroke="#00008b" stroke-width="2" fill="#00008b"/>
+ <path d="M 1204 126 C 1191 95, 1194 54, 1215 54 C 1233 54, 1238 87, 1230 116" stroke="#00008b" stroke-width="2" fill="none"/>
+ <text x="1185" y="48" fill="#000000" font-family="Arial" font-size="9">recursion 2</text>
+ <polygon points="1234,116 1227,124 1227,113 1234,116" stroke="#00008b" stroke-width="2" fill="#00008b"/>
+ <path d="M 1202 126 C 1178 81, 1182 18, 1215 18 C 1245 18, 1251 73, 1233 116" stroke="#00008b" stroke-width="2" fill="none"/>
+ <text x="1185" y="12" fill="#000000" font-family="Arial" font-size="9">recursion 3</text>
+ <polygon points="1236,116 1229,124 1230,113 1236,116" stroke="#00008b" stroke-width="2" fill="#00008b"/>
+ <polygon points="1579,126 1521,126 1521,162 1579,162 1579,126" stroke="#006400" fill="none"/>
+ <text x="1529" y="145" fill="#000000" font-family="Arial" font-size="9">factorial</text>
+ <path d="M 1244 144 C 1304 144, 1442 144, 1510 144" stroke="#0000ff" fill="none"/>
+ <text x="1332" y="138" fill="#000000" font-family="Arial" font-size="10">trace (db✓)</text>
+ <polygon points="1510,140 1520,144 1510,147 1510,140" stroke="#0000ff" fill="#0000ff"/>
+ <polygon points="1664,198 1436,198 1436,234 1664,234 1664,198" stroke="#c0c0c0" fill="#d3d3d3"/>
+ <text x="1444" y="217" fill="#000000" font-family="Arial" font-size="9">std::invalid_argument::invalid_argument</text>
+ <path d="M 1244 150 C 1290 160, 1383 180, 1454 196" stroke="#c0c0c0" fill="none"/>
+ <text x="1353" y="164" fill="#000000" font-family="Arial" font-size="10">(sib)</text>
+ <polygon points="1455,192 1464,198 1453,199 1455,192" stroke="#c0c0c0" fill="#c0c0c0"/>
+ <polygon points="1870,126 1762,126 1762,162 1870,162 1870,126" stroke="#9370db" fill="#e6e6fa"/>
+ <text x="1770" y="145" fill="#000000" font-family="Arial" font-size="9">invalid_argument</text>
+ <path d="M 1579 144 C 1620 144, 1697 144, 1752 144" stroke="#9370db" fill="none"/>
+ <text x="1700" y="138" fill="#000000" font-family="Arial" font-size="10">(ctx)</text>
+ <polygon points="1752,140 1762,144 1752,147 1752,140" stroke="#9370db" fill="#9370db"/>
+</svg>

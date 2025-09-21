@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG to 3D Visualization</title>
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- Import map for Three.js modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+            "three/examples/jsm/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="app-container">
+        <div id="viewport-area">
+            <div id="threejs-mount"></div>
+            <div class="stop-row">
+                <button id="stop-button" class="stop-button" title="freeze animation">
+                    stop
+                </button>
+                <small class="hint-text">
+                    (Interactive: Left-mouse drag; mouse scroll; right-mouse drag :-)
+                </small>
+            </div>
+        </div>
+        
+        <div id="controls-panel" class="controls-panel">
+            <h2>Controls</h2>
+
+            <!-- Running Values -->
+                <h3>Running Values</h3>
+                <div class="control-group">
+                    <label>Yaw angle (Δ°): <span id="run-yaw"></span></label>
+                </div>
+                <div class="control-group">
+                    <label>Pitch angle (Δ°): <span id="run-pitch"></span></label>
+                </div>
+                <div class="control-group">
+                    <label>Pan X (Δ): <span id="run-panx"></span></label>
+                </div>
+                <div class="control-group">
+                    <label>Pan Y (Δ): <span id="run-pany"></span></label>
+                </div>
+                <div class="control-group">
+                    <label>Zoom (distance): <span id="run-zoom"></span></label>
+                </div>
+
+                <!-- Camera Section -->
+                <h3>Camera</h3>
+                <div class="control-group">
+                    <label>X: <span id="cam-x-value"></span></label>
+                    <input type="range" id="cam-x" min="-100" max="100" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label>Y: <span id="cam-y-value"></span></label>
+                    <input type="range" id="cam-y" min="-100" max="100" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label>Z (distance): <span id="cam-z-value"></span></label>
+                    <input type="range" id="cam-z" min="0" max="1" step="0.001">
+                </div>
+                <div class="button-group">
+                    <button id="sync-camera">Sync from current view</button>
+                    <button id="apply-camera">Sync view to settings</button>
+                    <button id="reset-view">Reset view</button>
+                </div>
+
+                <hr>
+
+                <!-- Auto-Spin Section -->
+                <h3>Animation</h3>
+                <div class="control-group">
+                    <label>Yaw speed (°/s): <span id="yaw-speed-value"></span></label>
+                    <input type="range" id="yaw-speed" min="0" max="40" step="0.5">
+                    <small>Bounces at ±100°</small>
+                </div>
+                <div class="control-group">
+                    <label>Pitch speed (°/s): <span id="pitch-speed-value"></span></label>
+                    <input type="range" id="pitch-speed" min="0" max="20" step="0.5">
+                    <small>Bounces at ±90°</small>
+                </div>
+                <div class="control-group">
+                    <label>Pan X speed: <span id="pan-x-speed-value"></span></label>
+                    <input type="range" id="pan-x-speed" min="0" max="80" step="1">
+                    <small>Bounces at ±limit</small>
+                </div>
+                <div class="control-group">
+                    <label>Pan Y speed: <span id="pan-y-speed-value"></span></label>
+                    <input type="range" id="pan-y-speed" min="0" max="80" step="1">
+                    <small>Bounces at ±limit</small>
+                </div>
+                <div class="control-group">
+                    <label>Zoom speed: <span id="zoom-speed-value"></span></label>
+                    <input type="range" id="zoom-speed" min="0" max="200" step="1">
+                    <small>Bounces between min/max</small>
+                </div>
+
+                <hr>
+
+                <!-- Light Section -->
+                <h3>Light</h3>
+                <div class="control-group">
+                    <label>Intensity: <span id="light-intensity-value"></span></label>
+                    <input type="range" id="light-intensity" min="0" max="6" step="0.05">
+                </div>
+                <div class="control-group">
+                    <label>Position X: <span id="light-x-value"></span></label>
+                    <input type="range" id="light-x" min="-100" max="100" step="0.5">
+                </div>
+                <div class="control-group">
+                    <label>Position Y: <span id="light-y-value"></span></label>
+                    <input type="range" id="light-y" min="-100" max="100" step="0.5">
+                </div>
+                <div class="control-group">
+                    <label>Position Z: <span id="light-z-value"></span></label>
+                    <input type="range" id="light-z" min="-100" max="400" step="0.5">
+                </div>
+
+                <hr>
+
+                <!-- Node Fill Section -->
+                <h3>Node fill</h3>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="fill-nodes" checked>
+                        Fill nodes
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="smart-fill">
+                        Smart fill closed shapes (circles, ellipses, polygons)
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>Node fill color</label>
+                    <input type="color" id="node-fill-color" value="#ffffff">
+                </div>
+                <div class="control-group">
+                    <label>Node fill opacity: <span id="node-opacity-value"></span></label>
+                    <input type="range" id="node-opacity" min="0" max="1" step="0.01">
+                </div>
+
+                <hr>
+
+                <!-- Mesh & Shadows Section -->
+                <h3>Mesh & Shadows</h3>
+                <div id="color-mode-indicator" style="padding: 8px; margin-bottom: 8px; border-radius: 4px; background: #e3f2fd; display: none;">
+                    <small style="color: #1565c0;">📌 Using colors from SVG for strokes and text</small>
+                </div>
+                <div class="control-group">
+                    <label>Mesh (ink) color <span class="color-control-disabled" style="display: none;">(disabled - using SVG colors)</span></label>
+                    <input type="color" id="mesh-color" value="#1b4f72">
+                </div>
+                <div class="control-group">
+                    <label>Shadow type</label>
+                    <select id="shadow-type">
+                        <option value="VSM" selected>VSM (radius + samples)</option>
+                        <option value="PCFSoft">PCFSoft (radius ignored)</option>
+                    </select>
+                </div>
+                <div id="vsm-controls">
+                    <div class="control-group">
+                        <label>Shadow radius: <span id="shadow-radius-value"></span></label>
+                        <input type="range" id="shadow-radius" min="0" max="15" step="0.5">
+                    </div>
+                    <div class="control-group">
+                        <label>Blur samples: <span id="shadow-blur-value"></span></label>
+                        <input type="range" id="shadow-blur" min="1" max="32" step="1">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>Shadow opacity: <span id="shadow-opacity-value"></span></label>
+                    <input type="range" id="shadow-opacity" min="0" max="1" step="0.01">
+                </div>
+                <div class="control-group">
+                    <label>Shadow color</label>
+                    <input type="color" id="shadow-color" value="#000000">
+                </div>
+
+                <hr>
+
+                <!-- Wall & Scene Section -->
+                <h3>Wall & Scene</h3>
+                <div class="control-group">
+                    <label>Wall color</label>
+                    <input type="color" id="wall-color" value="#f3f3f6">
+                </div>
+                <div class="control-group">
+                    <label>
+                        <input type="checkbox" id="wall-flat">
+                        Wall flat color (disable wall shading)
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>Background</label>
+                    <input type="color" id="background-color" value="#ffffff">
+                </div>
+
+                <div class="button-group">
+                    <button id="reset-view-2">Reset view</button>
+                    <button id="reset-defaults">Defaults</button>
+                </div>
+
+                <!-- SVG Input Section -->
+                <div class="control-group">
+                    <label>SVG (paste to update)</label>
+                    <textarea id="svg-input" placeholder="Paste SVG content here..."></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load sample SVG data -->
+    <script src="data/sample-svg.js"></script>
+    
+    <!-- Main application module -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

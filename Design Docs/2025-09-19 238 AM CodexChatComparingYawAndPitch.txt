@@ -1,0 +1,116 @@
+Can you please compare, in detail, the differences between how Pitch and Yaw are implemented. Include in this any logic differences, parameter differences (not values, but existence of), etc.
+
+
+Yaw and pitch share the same engine scaffolding, but the implementation diverges in several places:
+
+State & Direction
+
+Yaw alone tracks plan-cap and slider versioning (js/animation/animation-engine.js:113, js/animation/animation-engine.js:117), while pitch has no equivalent state bookkeeping.
+Yaw velocities use spin.yawDir * spin.yawSpeed, whereas pitch negates its direction to account for polar-angle convention (js/animation/animation-engine.js:200, js/animation/animation-engine.js:317).
+Helper maps keep that asymmetry: yaw passes spin.yawDir, pitch passes -spin.pitchDir through every transition helper (js/animation/animation-engine.js:538, js/animation/animation-engine.js:570).
+Default config starts yaw spinning (500 °/s) but leaves pitch idle at 0 °/s (js/config.js:47, js/config.js:48).
+Initial travel directions also differ by design: yaw begins negative (clockwise), pitch begins positive (upward) (js/config.js:147, js/config.js:148).
+Control Flow & Retargeting
+
+Yaw continuously watches for speed-slider edits and retargets mid-decel or mid-reversal via retargetYawOnSpeedChange (js/animation/animation-engine.js:200, js/animation/animation-engine.js:303, js/animation/animation-engine.js:880); pitch has no retarget hook and simply keeps easing (js/animation/animation-engine.js:365).
+Yaw decel transitions capture a per-ms plan cap that is later reused during reversal ramps, something pitch never records (js/animation/animation-engine.js:591, js/animation/animation-engine.js:611).
+Pending speed updates apply at different milestones: yaw can queue while reversing or accelerating and flush on steady (js/animation/animation-engine.js:676, js/animation/animation-engine.js:1049), pitch only flushes when it reaches steady or completes a reversal (js/animation/animation-engine.js:683, js/animation/animation-engine.js:1242).
+Yaw reversals enforce additional geometric limits during both braking and acceleration phases (js/animation/animation-engine.js:925, js/animation/animation-engine.js:943); pitch reversals just reuse the symmetric accel computed for the current state (js/animation/animation-engine.js:1232, js/animation/animation-engine.js:1234).
+Bounce & Predictive Handling
+
+Yaw bounce logic includes dt-swept soft-overshoot detection, separate decision/plan accelerations, and center-runway plan caps (js/animation/animation-engine.js:964, js/animation/animation-engine.js:1147, js/animation/animation-engine.js:1072); pitch lacks those layers.
+Pitch bounce is simpler: clamp, zero velocity, and plan reversal with a single aUsed, optionally adding a late margin term (js/animation/animation-engine.js:1185, js/animation/animation-engine.js:1246).
+Clamp responses diverge: yaw flips yawDir inward (js/animation/animation-engine.js:979, js/animation/animation-engine.js:1094), pitch sets pitchDir to the sign of its displacement (js/animation/animation-engine.js:1197, js/animation/animation-engine.js:1394).
+Only yaw uses a predictive lead multiplier and overshoot tweaks when deciding reversals (js/animation/animation-engine.js:1099, js/animation/animation-engine.js:1152); pitch’s predictive logic relies solely on the computed stop distance (js/animation/animation-engine.js:1249).
+Configuration & UI
+
+Yaw exposes numerous tuning knobs—predictive lead, trigger tweaks, clamp ease/plan multipliers, soft-overshoot logging (js/config.js:98, js/config.js:109, js/config.js:116, js/config.js:122, js/config.js:133); pitch only offers the optional late-margin toggle (js/config.js:311, js/config.js:313).
+Yaw speed UI optionally defers updates while reversing based on DEFER_YAW_UI_WHILE_REVERSING (js/ui/ui-controller.js:233, js/config.js:127); pitch always defers whenever it is off steady (js/ui/ui-controller.js:256).
+The yaw slider writes straight into the engine and relies on retargeting for safety (js/ui/ui-controller.js:235, js/animation/animation-engine.js:880); the pitch slider stages changes in _pendingPitchSpeed until the FSM is ready (js/ui/ui-controller.js:262, js/animation/animation-engine.js:683).
+Diagnostics mirror those differences: yaw emits extra sampled logs for retarget, clamp acceleration, and predictive tweaks that pitch never produces (js/animation/animation-engine.js:901, js/animation/animation-engine.js:1086 versus js/animation/animation-engine.js:1241).
+For both Yaw and Pitch, how is reversal and runway handled? More specifically, are there distinct states for ramp-up from 0 to target speed and then ramp-down? Or is there a single state for ramp up/down?
+
+
+Yaw & Pitch FSM
+
+Both axes keep separate FSM slots initialized to e*_SteadyStateZero, e*_SteadyStateVel, e*_IncreaseVelToSteadyState, e*_DecreaseVelToZero, and e*_ReverseDirection, so ramp-up and ramp-down are distinct phases rather than a single combined state (js/animation/animation-engine.js:82, js/animation/animation-engine.js:538, js/animation/animation-engine.js:567, js/animation/animation-engine.js:692).
+Entering motion from rest calls transitionToSteadyVel, which zeroes the transition velocity and—when easing is enabled—places the axis in e*_IncreaseVelToSteadyState; the integrator then accelerates using the chosen per‑ms A until the steady target is reached (js/animation/animation-engine.js:538).
+Spinning down runs through transitionToZero, which seeds the current velocity and puts the axis in e*_DecreaseVelToZero while easing ramps the velocity toward zero (js/animation/animation-engine.js:567).
+Runway During Ramp & Reversal
+
+Ramp-up for both yaw and pitch sizes its acceleration with runway-aware math: computeOutwardRunway measures the distance to the active limit, computeAccelMax compares the time-constant accel versus the v²/(2d) requirement, and the larger value is applied so the axis can reach target speed without violating the limit (js/animation/animation-engine.js:374, js/animation/animation-engine.js:812, js/animation/animation-engine.js:834).
+When a limit is encountered or predictive braking fires, initiateReversal flips the direction, keeps the same easing infrastructure, and transitions the axis into e*_ReverseDirection with an acceleration budget either from the runway calculation or a default time-form delta‑V (js/animation/animation-engine.js:964, js/animation/animation-engine.js:1185, js/animation/animation-engine.js:1297).
+Within e*_ReverseDirection, processReversal continuously updates the transitional velocity; yaw applies extra runway constraints through computeAvailableRunway/computeRunwayToCenter and a yaw-only plan-cap so the ramp away from the boundary respects both geometry and prior planning, while pitch reuses the symmetric accel selected when the reversal was triggered (js/animation/animation-engine.js:925, js/animation/animation-engine.js:940, js/animation/animation-engine.js:780, js/animation/animation-engine.js:1232).
+Axis-Specific Nuances
+
+Yaw stores additional per-segment data (yawPlanCapPerMs, slider versioning) that further gate reversal accel; pitch lacks these extras but still uses the same runway helpers and multi-state ramping (js/animation/animation-engine.js:113, js/animation/animation-engine.js:880).
+Clamp handling feeds back into the same state machine: yaw enforces predictive lookahead and plan caps, whereas pitch optionally applies a late margin but otherwise follows the simpler hard-clamp → reversal flow (js/animation/animation-engine.js:1099, js/animation/animation-engine.js:1246).
+Thank you. I am confused about how e_IncreaseVelToSteadyState, e_DecreaseVelToZero, and e*_ReverseDirection relate, including such questions as:
+
+It would seem, from the names, that we would have e_IncreaseVelToSteadyState followed by e_DecreaseVelToZero, where e_ReverseDirection would be implicit and unneeded. Or, it would "cover" both decreasing to 0 and increasing again thereafter after a bounce, and thus again, would not be a "state" comparable to, and separate from, e_IncreaseVelToSteadyState followed and e*_DecreaseVelToZero.
+How long is the system in e*_ReverseDirection vs. in the other two states, and what determines that length.
+
+e_IncreaseVelToSteadyState and e_DecreaseVelToZero are the “one-direction” easing states; e*_ReverseDirection is a special bridge that wraps both braking and re-accel when a direction flip is required.
+
+When they activate
+
+e*_IncreaseVelToSteadyState starts whenever the axis is at/near rest and needs to spin up in its current direction. transitionToSteadyVel seeds the FSM with zero velocity and pushes the axis into this state (js/animation/animation-engine.js:538).
+e*_DecreaseVelToZero is used when the desired velocity for that axis is near zero and we want to coast down without flipping direction; transitionToZero populates the state and moves the FSM there (js/animation/animation-engine.js:567).
+e*_ReverseDirection is entered only when something actively asks for a direction change—typically a bounce handler or a reversal request—which calls initiateReversal. That helper flips the sign, assigns a braking/accel budget, and sets the FSM state to e*_ReverseDirection (js/animation/animation-engine.js:1297).
+Why e*_ReverseDirection isn’t redundant
+
+In that state, processReversal handles two phases inside one segment: it first brakes the existing velocity toward zero using either time-form easing or the runway-aware cap, then accelerates back out in the new direction using the same easing infrastructure (js/animation/animation-engine.js:692).
+This lets the engine keep geometric/runway limits and special yaw plan caps in play while the direction flips, without having to exit and re-enter the normal accel/decel states mid-reversal (js/animation/animation-engine.js:925, js/animation/animation-engine.js:940).
+Relation to the other states
+
+A typical bounce looks like e*_SteadyStateVel → e*_ReverseDirection → e*_SteadyStateVel (once the new direction hits its target).
+A user pause/resume looks like e*_SteadyStateVel → e*_DecreaseVelToZero → e*_SteadyStateZero, then later e*_IncreaseVelToSteadyState → e*_SteadyStateVel.
+If a slider change happens mid-reversal, yaw may retarget the ongoing e*_ReverseDirection phase rather than restarting a fresh accel/decel pass (js/animation/animation-engine.js:880).
+How long the system stays in e*_ReverseDirection
+
+The state persists until processReversal sees the transitional velocity aligned in sign and magnitude with the new desired value (or reaches zero when speed is effectively zero). At that point it snaps to either e*_SteadyStateVel or e*_SteadyStateZero, clears the per-axis acceleration, and—for yaw—resets any plan-cap bookkeeping (js/animation/animation-engine.js:703, js/animation/animation-engine.js:720, js/animation/animation-engine.js:715).
+Practically, this is as long as it takes to brake from the old speed and ramp up to the target, governed by the easing constant, runway-based accel limits, and any special caps applied during the reversal.
+So, e*_IncreaseVelToSteadyState and e*_DecreaseVelToZero cover straight-line ramping without changing direction. e*_ReverseDirection is a dedicated state that spans both halves of a direction flip, keeping the motion continuous and runway-safe until the new steady state is established.
+
+For Yaw, when it retargets, does it immediately enter the e*_ReverseDirection always, or is that variable, and if variable, based on what? And is retargeting something that happens only in consequences of of slider motion?
+
+In e*_ReverseDirection mode, what triggers the acceleration switching sign (if that is what it does), and how frequently is the test for switching sign made? And is that the same for Pitch and Yaw?
+
+
+Yaw Retargeting
+
+Spinner watches spin.yawSpeed every frame; if the value changed (UI slider or any code writing to the property), it bumps _yawSpeedVer in processYawFSM (js/animation/animation-engine.js:200-207).
+Retargeting happens only when a version bump is pending. The helper retargetYawOnSpeedChange is called while decelerating or reversing (js/animation/animation-engine.js:263, js/animation/animation-engine.js:303, js/animation/animation-engine.js:880).
+It does not automatically throw the FSM into eYaw_ReverseDirection.
+If the axis is in eYaw_DecreaseVelToZero and the new desired speed points the same way, the helper flips the state to eYaw_IncreaseVelToSteadyState so the spin ramps back up without reversing (js/animation/animation-engine.js:895-904).
+If the axis is already mid-reversal (eYaw_ReverseDirection), the helper keeps that state but recomputes the braking/accel budget, either tightening the brake phase or reducing the re-accel ceiling (js/animation/animation-engine.js:925-954).
+In any other state the version flag is simply consumed and the existing FSM continues unchanged (js/animation/animation-engine.js:915-919).
+UI slider motion is the usual trigger (js/ui/ui-controller.js:233-253), but any code path that sets spin.yawSpeed will have the same effect.
+Reverse-Direction Dynamics
+
+e*_ReverseDirection is active only after initiateReversal flips the sign and seeds a braking/accel limit (js/animation/animation-engine.js:1297-1323). processReversal runs every animation frame (stepSpin calls it once per axis per frame) to evolve the transitional velocity (js/animation/animation-engine.js:692-705).
+While the current transitional velocity still opposes the new desired direction, the logic treats it as a braking phase and forces acceleration to oppose the motion (js/animation/animation-engine.js:925-934).
+Once the velocity and desired share a sign, it switches to the acceleration phase: the target speed stays in place, but the computed aPerMs flips sign because the time-form term (desired - v)/easeMs becomes positive, and yaw additionally clamps it against runway/plan caps (js/animation/animation-engine.js:939-947).
+The test for whether braking has finished and whether the segment is done happens every frame, immediately after the velocity update. When the transitional velocity matches the desired sign and magnitude (within epsilon), the FSM exits e*_ReverseDirection and settles into the steady state with A = 0 (js/animation/animation-engine.js:699-714).
+Pitch runs through the same processReversal logic, but without yaw’s extra runway bookkeeping; yaw alone consults computeAvailableRunway and yawPlanCapPerMs for accel ceilings (js/animation/animation-engine.js:925, js/animation/animation-engine.js:940).
+When a transition is made to e_SteadyStateVel, are any variables other than the state variable itself explicitly/manually changed? Note that the answer to this may vary depending on within what context we are entering e_SteadyStateVel.
+
+
+Whenever an axis enters e*_SteadyStateVel, the engine always touches more than just the state flag; the exact side effects depend on which helper drove the transition:
+
+Immediate start (no easing) – transitionToSteadyVel sets the transitional velocity to the desired steady value, zeroes the acceleration term, and resets the start-sign tracker before assigning the new state (js/animation/animation-engine.js:554-562).
+
+Eased spin-up completion – when processAccelToSteady detects that the ramp has reached the target, it snaps the transitional velocity to the desired rate, clears the per-ms acceleration, switches the state, and then applies any queued slider change for that axis (yaw or pitch) (js/animation/animation-engine.js:671-688).
+
+Reversal completion – inside processReversal, finishing the flip likewise snaps TransitionVel, zeros A, and enters e*_SteadyStateVel; yaw also clears yawPlanCapPerMs and both axes flush any _pending*Speed that was waiting for the new steady direction (js/animation/animation-engine.js:703-718).
+
+Clamp-side snap outs – when yaw is clamped at the limit during a soft overshoot and the outward velocity collapses, the handler sets the reversed steady velocity, zeros the acceleration, drops the plan cap, and moves back to steady state (js/animation/animation-engine.js:1049-1061).
+
+Zero-ease reversals – if a reversal (or any transitionToSteadyVel) is invoked with the global ease time at zero, initiateReversal immediately writes the new steady velocity and zero acceleration before setting the steady state (js/animation/animation-engine.js:1307-1321).
+
+Across all those entry points, the pattern is consistent: the FSM doesn’t just flip the state label—it also brings the current transitional velocity and acceleration into a steady, zero-accel configuration, and clears any yaw-only bookkeeping (plan cap/pending speed) that’s no longer needed.
+
+Am I correct that Yaw retargeting code does not change the state?
+
+
+No—retargetYawOnSpeedChange can change the FSM state. The decel branch explicitly flips from eYaw_DecreaseVelToZero to eYaw_IncreaseVelToSteadyState when the new desired speed keeps the same sign (js/animation/animation-engine.js:895-904). In all other paths it simply adjusts acceleration or consumes the version without altering the current state (js/animation/animation-engine.js:906-957).

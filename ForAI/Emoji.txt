@@ -1,0 +1,58 @@
+Got it. The character "▶" is showing up styled that way directly in a block of text, not inside an SVG.
+
+This is happening because your operating system or browser is automatically replacing the standard text character with its more graphical **emoji** equivalent.
+
+---
+## Emoji Rendering
+
+Modern operating systems (like Windows, macOS, Android, and iOS) and browsers have built-in emoji sets. When they encounter a Unicode character that also has an emoji representation, they often automatically substitute the plain, black text character with the colorful, stylized emoji version.
+
+The character "▶" (Unicode U+25B6) is one of these characters.
+
+**The specific design—a white arrow on a blue square—is simply how the emoji is designed in the font set used by your particular device or application.**
+
+* A user on a **Windows** machine might see Microsoft's Segoe UI Emoji version.
+* A user on an **iPhone** will see Apple's version.
+* An **Android** user will see Google's Noto Color Emoji version.
+
+Each of these will look slightly different, but they often follow a similar design pattern for simple symbols like play buttons. You are likely seeing the default "play button" emoji for your system. ▶️
+
+
+
+### How to Prevent It (for developers)
+
+If a developer wants to force the character to display as plain text without the emoji styling, they can add a special invisible character called a "variation selector" (U+FE0E) immediately after it.
+
+* `▶` → Renders as emoji by default on many systems.
+* `▶︎` (with U+FE0E) → Renders as plain text.
+
+So, it's not a bug, but rather an intentional feature of modern text rendering designed to make text more expressive.
+
+
+
+
+Thank you. Question: If I replaced ▶ with ▶️, would it work on more than just Windows?
+
+Yes, absolutely. Using the explicit emoji character ▶️ is the most reliable way to ensure the graphical, colorful version appears across all modern operating systems, not just Windows.
+
+How it Works: The Variation Selector
+The difference between the two is an invisible character called a variation selector.
+
+▶ (U+25B6): This is the base character. Its appearance can be ambiguous. Most modern systems will default to showing the emoji, but older systems or specific contexts might show it as plain black text.
+
+▶️ (U+25B6 followed by U+FE0F): This is the base character plus an explicit instruction (U+FE0F) to the rendering system to display it with emoji presentation.
+
+By adding that invisible selector, you are removing the ambiguity and making your intent clear.
+
+Cross-Platform Consistency
+This is the standard and correct way to request an emoji across different platforms. While the specific design of the emoji will still change depending on the OS, using ▶️ ensures that an emoji is what you'll get.
+
+✅ macOS / iOS: Will show Apple's emoji.
+
+✅ Android: Will show Google's emoji.
+
+✅ Windows: Will show Microsoft's emoji.
+
+✅ Linux: Will show the system's default emoji set.
+
+So, if your goal is to have a colorful play button icon appear consistently for all users, using ▶️ is the best practice.

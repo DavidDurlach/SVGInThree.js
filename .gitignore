@@ -1,0 +1,78 @@
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs and coverage
+dist/
+build/
+coverage/
+.nyc_output/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python environments and packaging
+.Python
+env/
+venv/
+ENV/
+.venv/
+pip-wheel-metadata/
+*.egg-info/
+*.egg
+.eggs/
+share/python-wheels/
+wheels/
+develop-eggs/
+downloads/
+sdist/
+lib/
+lib64/
+parts/
+var/
+.installed.cfg
+MANIFEST
+
+# Python tooling caches
+.pytest_cache/
+.coverage
+.coverage.*
+.cache/
+.mypy_cache/
+.pytype/
+.pyre/
+.tox/
+.hypothesis/
+
+# Environment files
+.env
+.env.*
+!.env.example
+.envrc
+
+# Logs and temp files
+*.log
+*.tmp
+*.bak
+nohup.out
+
+# Project-specific
+Archive/
+

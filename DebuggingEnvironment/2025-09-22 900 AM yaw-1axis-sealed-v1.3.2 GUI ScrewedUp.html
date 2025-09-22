@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yaw 1-Axis Sealed — v1.3.2 (EPS-centric, rotating arm viz)</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --fg: #e8eef5;
+      --muted: #9bb0c7;
+      --accent: #7bb3ff;
+      --panel: #111723;
+      --panel2: #162134;
+      --line: #20304b;
+      --ok: #59d98e;
+      --warn: #ffb84b;
+      --bad: #ff6b6b;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font: 14px/1.45 system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg); color: var(--fg);
+      display: grid; grid-template-rows: auto 1fr;
+    }
+    header { padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 1; }
+    header h1 { margin: 0; font-size: 18px; }
+    header .sub { color: var(--muted); font-size: 12px; }
+    main { display: grid; grid-template-columns: 360px 1fr; gap: 12px; padding: 12px; }
+    aside, section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+    .row { display: flex; align-items: center; gap: 10px; margin: 6px 0; flex-wrap: wrap; }
+    label { min-width: 140px; color: var(--muted); font-size: 13px; }
+    input[type="number"] { width: 110px; padding: 5px 7px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--fg); }
+    input[type="checkbox"] { transform: translateY(1px); }
+    button { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel2); color: var(--fg); cursor: pointer; }
+    button:hover { border-color: #2d4571; }
+    button:active { transform: translateY(1px); }
+    .btnbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .badge { display:inline-block; padding: 2px 8px; border-radius: 999px; background: #1a2640; border: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kv { display:grid; grid-template-columns: auto 1fr; gap:6px 12px; }
+    .kv div:nth-child(odd) { color: var(--muted); }
+    #viz { height: 360px; background: #0e1624; border: 1px solid var(--line); border-radius: 8px; position: relative; overflow: hidden; }
+    #viz canvas { width: 100%; height: 100%; display: block; }
+    .mono { font-family: var(--mono); }
+    #logs { height: 260px; width: 100%; background: #0e1624; border: 1px solid var(--line); border-radius: 8px; color: #d6e2f2; padding: 8px; white-space: pre; overflow: auto; font: 12px/1.35 var(--mono); }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Yaw 1-Axis Sealed <span class="sub">— v1.3.2 • EPS single source • selector-only neutral band • pure stages • ordered events • rotating arm viz</span></h1>
+  </header>
+
+  <main>
+    <aside>
+      <div class="btnbar">
+        <button id="btnStart">Start</button>
+        <button id="btnPause">Pause</button>
+        <button id="btnStep">Step</button>
+        <button id="btnReset">Reset</button>
+        <button id="btnClear">Clear logs</button>
+      </div>
+
+      <div class="row"><span class="badge" id="bPhase">phase: toLimit(+)</span><span class="badge" id="bStage">stage: accel</span></div>
+
+      <h3 class="muted">Parameters</h3>
+      <div class="grid2">
+        <div class="row"><label for="L">Limit L (deg)</label><input id="L" type="number" step="0.1" value="45"></div>
+        <div class="row"><label for="aCap">aCap (deg/s²)</label><input id="aCap" type="number" step="0.1" value="80"></div>
+        <div class="row"><label for="dt">dt (s)</label><input id="dt" type="number" step="0.001" value="0.016667"></div>
+        <div class="row"><label for="epsX">EPS.x</label><input id="epsX" type="number" step="1e-6" value="1e-6"></div>
+        <div class="row"><label for="epsV">EPS.v</label><input id="epsV" type="number" step="1e-6" value="1e-6"></div>
+        <div class="row"><label for="epsT">EPS.t</label><input id="epsT" type="number" step="1e-9" value="1e-9"></div>
+        <div class="row"><label for="epsSel">EPS.sel (deg)</label><input id="epsSel" type="number" step="0.01" value="0.5"></div>
+        <div class="row"><input type="checkbox" id="chkLogs" checked><label for="chkLogs">Log frames</label></div>
+      </div>
+
+      <h3 class="muted">State</h3>
+      <div class="kv">
+        <div>t</div><div id="kv_t">0.000</div>
+        <div>x</div><div id="kv_x">0.00</div>
+        <div>v</div><div id="kv_v">0.00</div>
+        <div>a</div><div id="kv_a">0.00</div>
+        <div>dir</div><div id="kv_dir">+1</div>
+        <div>phase</div><div id="kv_phase">toLimit(+)</div>
+        <div>stage</div><div id="kv_stage">accel</div>
+        <div>dTow</div><div id="kv_dTow">–</div>
+        <div>dBrake</div><div id="kv_dBrake">–</div>
+      </div>
+    </aside>
+
+    <section>
+      <div id="viz"><canvas id="cv"></canvas></div>
+      <div class="row" style="margin-top:10px; justify-content:space-between;">
+        <div class="muted">Frames log</div>
+        <div class="muted mono" id="kv_info"></div>
+      </div>
+      <div id="logs"></div>
+    </section>
+  </main>
+
+  <script>
+  // ===== EPS single source of truth =====
+  const EPS = { x: 1e-6, v: 1e-6, t: 1e-9, sel: 0.5 };
+
+  // Parameters
+  const P = { L: 45, aCap: 80, dt: 1/60 };
+
+  // Dynamics state
+  const S = {
+    t: 0, x: 0, v: 0, a: 0,
+    phase: "toLimit",  // "toLimit" | "toMid"
+    side: +1,          // current outward side for toLimit
+    stage: "accel",    // "accel" | "decel" | "recover"
+    prevStage: "accel"
+  };
+
+  // ===== Helpers =====
+  const el = (q)=> document.querySelector(q);
+  const abs = Math.abs;
+  const sgn = (z)=> (z>0) - (z<0);
+  const clamp = (x,lo,hi)=> Math.max(lo, Math.min(hi, x));
+  const d2r = (d)=> d*Math.PI/180;
+
+  // Solve 0.5 a t^2 + v0 t + (x0 - xT) = 0 for t>EPS.t
+  function timeToX(x0, v0, a, xT) {
+    const dx = x0 - xT;
+    if (Math.abs(a) < 1e-12) {
+      if (Math.abs(v0) < 1e-12) return Infinity;
+      const t = -dx / v0;
+      return t > EPS.t ? t : Infinity;
+    }
+    const A = 0.5*a, B = v0, C = dx;
+    const D = B*B - 4*A*C;
+    if (D < 0) return Infinity;
+    const r = Math.sqrt(D);
+    let out = Infinity;
+    const t1 = (-B - r) / (2*A);
+    const t2 = (-B + r) / (2*A);
+    if (t1 > EPS.t) out = Math.min(out, t1);
+    if (t2 > EPS.t) out = Math.min(out, t2);
+    return out;
+  }
+
+  function timeToV0(v0, a) {
+    if (Math.abs(a) < 1e-12) return Infinity;
+    if (v0 * a >= 0) return Infinity;
+    const t = -v0 / a;
+    return t > EPS.t ? t : Infinity;
+  }
+
+  // ===== Selector (only place using EPS.sel hysteresis) =====
+  function selectStage(S, P) {
+    const { x, v, phase, side } = S;
+    const { L, aCap } = P;
+
+    // Outside recover is inward only, independent of phase/dir
+    if (abs(x) > L + EPS.x) {
+      return { stage: "recover", target: sgn(x)*L, a: -sgn(x)*aCap, dTow: abs(abs(x)-L), dBrake: v*v/(2*aCap) };
+    }
+
+    const target = (phase === "toLimit") ? (side * L) : 0;
+    const dTow = abs(target - x);
+    const dBrake = (v*v) / (2*aCap);
+
+    // I1: no-brake-away; if nearly stopped, accelerate toward target
+    if (abs(v) <= EPS.v) {
+      return { stage: "accel", target, a: sgn(target - x) * aCap, dTow, dBrake };
+    }
+
+    // Bang-bang with neutral band hysteresis
+    const band = EPS.sel;
+    const preferDecel = dBrake > dTow + band;
+    const preferAccel = dBrake < dTow - band;
+
+    if (preferDecel) return { stage: "decel", target, a: -sgn(v)*aCap, dTow, dBrake };
+    if (preferAccel) return { stage: "accel", target, a: sgn(target - x)*aCap, dTow, dBrake };
+
+    // Inside neutral band: stick to previous if sensible; default to decel
+    const stick = S.prevStage || "decel";
+    const stage = (stick === "accel") ? "accel" : "decel";
+    return { stage, target, a: stage==="accel" ? sgn(target-x)*aCap : -sgn(v)*aCap, dTow, dBrake };
+  }
+
+  // ===== Orchestrator — consume exactly dt with ordered events =====
+  function stepOne(dt, P) {
+    let dtLeft = dt;
+    let guard = 0;
+    while (dtLeft > EPS.t && guard++ < 12) {
+      const pick = selectStage(S, P);
+      S.stage = pick.stage;
+      S.a = pick.a;
+
+      const target = pick.target;
+      const tHitTarget = timeToX(S.x, S.v, S.a, target);
+      const tV0 = timeToV0(S.v, S.a);
+      const tHitLimit = Math.min(
+        timeToX(S.x, S.v, S.a, +P.L),
+        timeToX(S.x, S.v, S.a, -P.L)
+      );
+
+      // Prioritized event selection: land > stop > target
+      let tEvent = Infinity, evt = null;
+      if (tHitLimit < tEvent - EPS.t/2) { tEvent = tHitLimit; evt = "land"; }
+      if (tV0       < tEvent - EPS.t/2) { tEvent = tV0;       evt = "stop"; }
+      if (tHitTarget< tEvent - EPS.t/2) { tEvent = tHitTarget; evt = "target"; }
+
+      const tPiece = Math.min(dtLeft, tEvent);
+
+      // Integrate over tPiece
+      const x0 = S.x, v0 = S.v, a = S.a;
+      S.x = x0 + v0*tPiece + 0.5*a*tPiece*tPiece;
+      S.v = v0 + a*tPiece;
+      S.t += tPiece;
+      dtLeft -= tPiece;
+
+      // Handle event if it occurred strictly inside this slice
+      if (evt && tEvent <= tPiece - EPS.t/2) {
+        if (evt === "land") {
+          S.x = clamp(S.x, -P.L, +P.L);
+          S.v = 0;
+          S.phase = "toMid";
+          S.prevStage = S.stage;
+          continue;
+        }
+        if (evt === "stop") {
+          S.v = 0;
+          S.prevStage = S.stage;
+          continue;
+        }
+        if (evt === "target") {
+          S.x = target;
+          S.v = 0;
+          if (S.phase === "toLimit") {
+            S.phase = "toMid";
+          } else {
+            S.phase = "toLimit";
+            S.side = -S.side; // alternate limits
+          }
+          S.prevStage = S.stage;
+          continue;
+        }
+      }
+
+      S.prevStage = S.stage;
+    }
+  }
+
+  // ===== UI / Viz =====
+  const kv = {
+    t: el("#kv_t"), x: el("#kv_x"), v: el("#kv_v"), a: el("#kv_a"),
+    dir: el("#kv_dir"), phase: el("#kv_phase"), stage: el("#kv_stage"),
+    dTow: el("#kv_dTow"), dBrake: el("#kv_dBrake")
+  };
+  const badgePhase = el("#bPhase");
+  const badgeStage = el("#bStage");
+  const logs = el("#logs");
+  const info = el("#kv_info");
+
+  function readParams() {
+    P.L = parseFloat(el("#L").value);
+    P.aCap = parseFloat(el("#aCap").value);
+    P.dt = parseFloat(el("#dt").value);
+    EPS.x = parseFloat(el("#epsX").value);
+    EPS.v = parseFloat(el("#epsV").value);
+    EPS.t = parseFloat(el("#epsT").value);
+    EPS.sel = parseFloat(el("#epsSel").value);
+  }
+
+  function updateKV() {
+    const pick = selectStage(S, P);
+    kv.t.textContent = S.t.toFixed(3);
+    kv.x.textContent = S.x.toFixed(2);
+    kv.v.textContent = S.v.toFixed(2);
+    kv.a.textContent = S.a.toFixed(2);
+    kv.dir.textContent = (S.phase==="toLimit") ? (S.side>0?"+1":"-1") : (S.side>0?"-1":"+1");
+    kv.phase.textContent = (S.phase==="toLimit" ? `toLimit(${S.side>0?"+":"−"})` : "toMid");
+    kv.stage.textContent = S.stage;
+    kv.dTow.textContent = isFinite(pick.dTow) ? pick.dTow.toFixed(3) : "–";
+    kv.dBrake.textContent = isFinite(pick.dBrake) ? pick.dBrake.toFixed(3) : "–";
+    badgePhase.textContent = `phase: ${S.phase}${S.phase==="toLimit" ? (S.side>0?"(+)":"(−)"):""}`;
+    badgeStage.textContent = `stage: ${S.stage}`;
+    info.textContent = `EPS: x=${EPS.x} v=${EPS.v} t=${EPS.t} sel=${EPS.sel}`;
+  }
+
+  // Canvas drawing — rotating line segment ("arm") plus limit ticks and target marker
+  const cv = el("#cv");
+  const ctx = cv.getContext("2d");
+  function resize() {
+    const r = el("#viz").getBoundingClientRect();
+    cv.width = Math.max(320, Math.floor(r.width));
+    cv.height = Math.max(280, Math.floor(r.height));
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  function draw() {
+    const W = cv.width, H = cv.height;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = "#0e1624";
+    ctx.fillRect(0,0,W,H);
+
+    const cx = W*0.5, cy = H*0.56;
+    const r = Math.min(W,H)*0.36;
+
+    // Dial rim
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.strokeStyle = "#23324d";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Limit ticks ±L
+    function tick(angleDeg, len, color) {
+      const a = d2r(angleDeg);
+      const x1 = cx + Math.cos(a)*(r - len);
+      const y1 = cy + Math.sin(a)*(r - len);
+      const x2 = cx + Math.cos(a)*(r + 4);
+      const y2 = cy + Math.sin(a)*(r + 4);
+      ctx.beginPath();
+      ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+      ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
+    }
+    tick(+P.L, 14, "#7bb3ff");
+    tick(-P.L, 14, "#7bb3ff");
+
+    // Target marker (green dot on rim)
+    const targetDeg = (S.phase==="toLimit") ? (S.side*P.L) : 0;
+    const at = d2r(targetDeg);
+    const tx = cx + Math.cos(at)*r;
+    const ty = cy + Math.sin(at)*r;
+    ctx.beginPath();
+    ctx.arc(tx, ty, 5, 0, Math.PI*2);
+    ctx.fillStyle = "#59d98e";
+    ctx.fill();
+
+    // Neutral band visual (small arc around target)
+    const nb = EPS.sel;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r-8, d2r(targetDeg - nb), d2r(targetDeg + nb));
+    ctx.strokeStyle = "rgba(121, 190, 255, 0.5)";
+    ctx.lineWidth = 6;
+    ctx.stroke();
+
+    // Rotating arm (current x in degrees; positive = CCW)
+    const a = d2r(S.x);
+    const xTip = cx + Math.cos(a)*r;
+    const yTip = cy + Math.sin(a)*r;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(xTip, yTip);
+    ctx.strokeStyle = "#e8eef5";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Arm hub
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI*2);
+    ctx.fillStyle = "#e8eef5";
+    ctx.fill();
+
+    // Velocity wedge (small arrow near tip)
+    const vNorm = Math.max(-1, Math.min(1, S.v/(P.L*2)));
+    const vx = xTip, vy = yTip;
+    const va = a;
+    const vlen = 22 * Math.sign(vNorm||1);
+    ctx.beginPath();
+    ctx.moveTo(vx, vy);
+    ctx.lineTo(vx + Math.cos(va)*vlen, vy + Math.sin(va)*vlen);
+    ctx.strokeStyle = "#ffb84b";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  // Logging
+  const logs = el("#logs");
+  function log(msg) { logs.textContent += msg + "\\n"; logs.scrollTop = logs.scrollHeight; }
+  function logFrame(extra="") {
+    if (!el("#chkLogs").checked) return;
+    const pick = selectStage(S, P);
+    const dir = (S.phase==="toLimit") ? S.side : -S.side;
+    const m = `[FRAME] t=${S.t.toFixed(3)} x=${S.x.toFixed(2)} v=${S.v.toFixed(2)} aEff=${S.a.toFixed(2)} L=${P.L} dir=${dir} phase=${S.stage} dTow=${(pick.dTow??NaN).toFixed(2)} dBrake=${(pick.dBrake??NaN).toFixed(2)} ${extra}`;
+    log(m);
+  }
+
+  // Controls
+  function reset() {
+    readParams();
+    S.t = 0; S.x = 0; S.v = 0; S.a = 0;
+    S.phase = "toLimit"; S.side = +1;
+    S.stage = "accel"; S.prevStage = "accel";
+    logs.textContent = "[INIT] v1.3.2 consolidated EPS build loaded\\n";
+    updateKV(); draw();
+  }
+  el("#btnReset").addEventListener("click", reset);
+  el("#btnClear").addEventListener("click", ()=>{ logs.textContent = ""; });
+
+  ["L","aCap","dt","epsX","epsV","epsT","epsSel"].forEach(id => {
+    el("#"+id).addEventListener("change", ()=>{ readParams(); updateKV(); draw(); });
+  });
+
+  let running=false, raf=0;
+  function loop() {
+    if (!running) return;
+    readParams();
+    stepOne(P.dt, P);
+    updateKV(); draw(); logFrame();
+    raf = requestAnimationFrame(loop);
+  }
+  el("#btnStart").addEventListener("click", ()=>{
+    if (!running) { running = true; raf = requestAnimationFrame(loop); }
+  });
+  el("#btnPause").addEventListener("click", ()=>{
+    running = false; cancelAnimationFrame(raf);
+  });
+  el("#btnStep").addEventListener("click", ()=>{
+    readParams(); stepOne(P.dt,P); updateKV(); draw(); logFrame("[STEP]");
+  });
+
+  // Boot
+  reset();
+  draw();
+  </script>
+</body>
+</html>

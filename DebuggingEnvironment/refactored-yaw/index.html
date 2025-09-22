@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>One‑Axis Sandbox — 2D Orientation (Up‑Centered) — Refactor</title>
+<link rel="stylesheet" href="./styles.css"/>
+</head>
+<body>
+<header>
+  <h1>One‑Axis Sandbox — 2D Orientation (Up‑Centered) + Method 2 — Refactor</h1>
+  <div class="row">
+    <div class="panel">
+      <div class="row" style="gap:10px;">
+        <button id="play">▶︎ Play</button>
+        <button id="step" class="alt">Step</button>
+        <button id="reset" class="alt">Reset</button>
+        <span class="state mono" id="simState">paused</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="row" style="gap:14px;">
+        <div>
+          <label>Limit L (deg)</label>
+          <input type="range" id="limit" min="5" max="180" step="1" value="45">
+          <span id="limitV" class="mono v">45</span>
+        </div>
+        <div>
+          <label>V<sub>max</sub> (deg/s)</label>
+          <input type="range" id="vmax" min="0" max="180" step="1" value="60">
+          <span id="vmaxV" class="mono v">60</span>
+        </div>
+        <div>
+          <label>dt (ms)</label>
+          <input type="number" id="dt" min="1" max="200" step="0.1" value="16.667">
+        </div>
+        <div>
+          <label>Accel cap (deg/s²)</label>
+          <input type="range" id="acap" min="10" max="2000" step="10" value="600">
+          <span id="acapV" class="mono v">600</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="row" style="gap:16px;">
+        <div><label><input type="checkbox" id="subframe" checked> Sub‑frame stop</label></div>
+        <div><label><input type="checkbox" id="velScaled"> Velocity‑scaled brake</label></div>
+        <div><label><input type="checkbox" id="outsideRecover" checked> Outside recovery</label></div>
+        <div><label><input type="checkbox" id="pauseOnAnom" checked> Pause on anomaly</label></div>
+      </div>
+      <div class="row" style="gap:16px; margin-top:6px;">
+        <div class="radio">
+          <span>Resume policy:</span>
+          <label><input type="radio" name="resume" value="nearestApex" checked> nearest apex</label>
+          <label><input type="radio" name="resume" value="center"> center (0°)</label>
+        </div>
+        <div><label><input type="checkbox" id="dragPauses" checked> Pause while dragging</label></div>
+      </div>
+      <div class="small">Drag the dial to set angle; release to let Method 2 take over. Angle 0° is <strong>UP</strong>; ±L are symmetric about UP.</div>
+    </div>
+  </div>
+</header>
+
+<div class="panel" style="margin:12px 16px;">
+  <div class="canvasWrap">
+    <canvas id="dial" width="1000" height="320" title="Drag to set angle (0° = UP)"></canvas>
+  </div>
+  <div class="small">Dial: UP is vertical. The green line is current yaw x (deg from UP, CCW positive). Grey rays mark ±L.</div>
+</div>
+
+<div class="grid">
+  <div class="panel col">
+    <div class="readout mono">
+      <span class="k">x (deg)</span><span id="xV" class="v">0.00</span>
+      <span class="k">v (deg/s)</span><span id="vV" class="v">0.00</span>
+      <span class="k">a_eff (deg/s²)</span><span id="aV" class="v">0.00</span>
+      <span class="k">D<sub>rem</sub> (deg)</span><span id="dremV" class="v">0.00</span>
+      <span class="k">phase</span><span id="phaseV" class="v">accel</span>
+      <span class="k">dir</span><span id="dirV" class="v">+1</span>
+    </div>
+    <div class="canvasWrap">
+      <canvas id="plot1" width="800" height="240"></canvas>
+      <div class="legend" id="legend1">
+        <span class="sw" style="background:#9ab5ff"></span>x (deg)
+        &nbsp;&nbsp;
+        <span class="sw" style="background:#f9d67a"></span>v (deg/s)
+        &nbsp;&nbsp;
+        <span class="sw" style="background:#3b475a"></span>±L (x)
+        &nbsp;&nbsp;
+        <span class="sw" style="background:#705b2a"></span>±V<sub>max</sub> (v)
+      </div>
+    </div>
+    <div class="small">Position (x) and velocity (v). Grey bands mark ±L; brown bands mark ±V<sub>max</sub>.</div>
+  </div>
+
+  <div class="panel col">
+    <div class="readout mono">
+      <span class="k">t (s)</span><span id="tV" class="v">0.00</span>
+      <span class="k">anomaly</span><span id="anomV" class="v">—</span>
+      <span class="k">events</span><span id="evtV" class="v">—</span>
+      <span class="k">mode</span><span id="modeV" class="v">inside</span>
+      <span class="k">target apex</span><span id="apexV" class="v">+L</span>
+      <span class="k">s_stop (deg)</span><span id="sStopV" class="v">0.00</span>
+    </div>
+    <div class="canvasWrap">
+      <canvas id="plot2" width="800" height="240"></canvas>
+    </div>
+    <div class="small">Acceleration (a_eff) and instantaneous stop distance s_stop=v²/(2a_cap). Dots mark sub‑frame landings.</div>
+  </div>
+</div>
+
+<div class="loggrid">
+  <div>
+    <div class="row" style="gap:6px; align-items:center;"><strong>Anomalies</strong><span class="small"> (latest first, with per‑piece trace)</span></div>
+    <div class="btnrow">
+      <button id="copyAnoms" class="alt">Copy</button>
+      <button id="clearAnoms" class="alt">Clear</button>
+    </div>
+    <textarea id="anomsBox" spellcheck="false"></textarea>
+  </div>
+  <div>
+    <div class="row" style="gap:6px; align-items:center;"><strong>Console (captured)</strong><span class="small"> (last N lines)</span></div>
+    <div class="btnrow">
+      <button id="copyLogs" class="alt">Copy</button>
+      <button id="clearLogs" class="alt">Clear</button>
+    </div>
+    <textarea id="logsBox" spellcheck="false"></textarea>
+  </div>
+</div>
+
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>

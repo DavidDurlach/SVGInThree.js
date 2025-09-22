@@ -1,0 +1,30 @@
+:root{--mono: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#0b0d10;color:#e6eaef;}
+header{padding:12px 16px;border-bottom:1px solid #1f2329;background:#0f1216;position:sticky;top:0;z-index:2;}
+h1{font-size:18px;margin:0 0 6px 0;}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;}
+.panel{padding:10px 12px;border:1px solid #1f2329;border-radius:8px;background:#11151b;}
+label{font-size:12px;color:#b8c1cc;display:inline-block;min-width:120px;}
+input[type=range]{width:200px;}
+input[type=number]{width:86px;background:#0b0d10;color:#e6eaef;border:1px solid #29313b;border-radius:4px;padding:4px 6px;}
+button{background:#1b62ff;color:white;border:0;padding:7px 10px;border-radius:6px;cursor:pointer;}
+button.alt{background:#29313b;}
+button:disabled{opacity:.5;cursor:not-allowed;}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 16px;}
+.mono{font-family:var(--mono);font-size:12px;}
+.readout{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;align-items:center;}
+.canvasWrap{position:relative;}
+canvas{background:#0b0d10;border:1px solid #1f2329;border-radius:8px;width:100%;height:240px;display:block;}
+.k{color:#8fb3ff;}
+.v{color:#d6f7a3;}
+.state{padding:5px 9px;border-radius:999px;background:#182032;border:1px solid #263149;display:inline-block;}
+.warn{color:#ffd580;}
+.ok{color:#9be28a;}
+.small{font-size:12px;color:#9aa7b5;}
+.col{display:flex;flex-direction:column;gap:8px;}
+.radio{display:flex;gap:10px;font-size:12px;color:#b8c1cc;}
+.loggrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px 16px;}
+textarea{width:100%;min-height:160px;resize:vertical;background:#0b0d10;color:#e6eaef;border:1px solid #29313b;border-radius:6px;padding:8px;font-family:var(--mono);font-size:12px;white-space:pre-wrap;}
+.btnrow{display:flex;gap:8px;margin:6px 0;}
+.legend{position:absolute;left:10px;top:10px;padding:4px 8px;background:rgba(20,24,31,0.75);border:1px solid #263149;border-radius:6px;font-family:var(--mono);font-size:11px;pointer-events:none;z-index:1;}
+.legend .sw{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:middle;}

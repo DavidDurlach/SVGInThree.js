@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>One‑Axis Sandbox — 2D Orientation (Up‑Centered) + Method 2 — v1.2.9</title>
+<style>
+  :root{--mono: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:0; background:#0b0d10; color:#e6eaef;}
+  header{padding:12px 16px; border-bottom:1px solid #1f2329; background:#0f1216; position:sticky; top:0; z-index:2;}
+  h1{font-size:18px; margin:0 0 6px 0;}
+  .row{display:flex; flex-wrap:wrap; gap:12px; align-items:center;}
+  .panel{padding:10px 12px; border:1px solid #1f2329; border-radius:8px; background:#11151b;}
+  label{font-size:12px; color:#b8c1cc; display:inline-block; min-width:120px;}
+  input[type=range]{width:200px;}
+  input[type=number]{width:86px; background:#0b0d10; color:#e6eaef; border:1px solid #29313b; border-radius:4px; padding:4px 6px;}
+  button{background:#1b62ff; color:white; border:0; padding:7px 10px; border-radius:6px; cursor:pointer;}
+  button.alt{background:#29313b;}
+  button:disabled{opacity:.5; cursor:not-allowed;}
+  .grid{display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding:12px 16px;}
+  .mono{font-family:var(--mono); font-size:12px;}
+  .readout{display:grid; grid-template-columns:repeat(6, 1fr); gap:6px; align-items:center;}
+  .canvasWrap{position:relative;}
+  canvas{background:#0b0d10; border:1px solid #1f2329; border-radius:8px; width:100%; height:240px; display:block;}
+  .k{color:#8fb3ff;}
+  .v{color:#d6f7a3;}
+  .state{padding:5px 9px; border-radius:999px; background:#182032; border:1px solid #263149; display:inline-block;}
+  .warn{color:#ffd580;}
+  .ok{color:#9be28a;}
+  .small{font-size:12px; color:#9aa7b5;}
+  .col{display:flex; flex-direction:column; gap:8px;}
+  .radio{display:flex; gap:10px; font-size:12px; color:#b8c1cc;}
+  .loggrid{display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:0 16px 16px;}
+  /* Keep literal newlines in the panes */
+  textarea{width:100%; min-height:160px; resize:vertical; background:#0b0d10; color:#e6eaef;
+           border:1px solid #29313b; border-radius:6px; padding:8px; font-family:var(--mono);
+           font-size:12px; white-space: pre-wrap;}
+  .btnrow{display:flex; gap:8px; margin:6px 0;}
+  .legend{position:absolute; left:10px; top:10px; padding:4px 8px; background:rgba(20,24,31,0.75);
+          border:1px solid #263149; border-radius:6px; font-family:var(--mono); font-size:11px;
+          pointer-events:none; z-index:1;}
+  .legend .sw{display:inline-block; width:10px; height:10px; margin-right:6px; vertical-align:middle;}
+</style>
+</head>
+<body>
+<header>
+  <h1>One‑Axis Sandbox — 2D Orientation (Up‑Centered) + Method 2 — v1.2.6 (Fix)</h1>
+  <div class="row">
+    <div class="panel">
+      <div class="row" style="gap:10px;">
+        <button id="play">▶︎ Play</button>
+        <button id="step" class="alt">Step</button>
+        <button id="reset" class="alt">Reset</button>
+        <span class="state mono" id="simState">paused</span>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="row" style="gap:14px;">
+        <div>
+          <label>Limit L (deg)</label>
+          <input type="range" id="limit" min="5" max="180" step="1" value="45">
+          <span id="limitV" class="mono v">45</span>
+        </div>
+        <div>
+          <label>V<sub>max</sub> (deg/s)</label>
+          <input type="range" id="vmax" min="0" max="180" step="1" value="60">
+          <span id="vmaxV" class="mono v">60</span>
+        </div>
+        <div>
+          <label>dt (ms)</label>
+          <input type="number" id="dt" min="1" max="200" step="0.1" value="100">
+        </div>
+        <div>
+          <label>Accel cap (deg/s²)</label>
+          <input type="range" id="acap" min="10" max="2000" step="10" value="600">
+          <span id="acapV" class="mono v">600</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="row" style="gap:16px;">
+        <div><label><input type="checkbox" id="subframe" checked> Sub‑frame stop</label></div>
+        <div><label><input type="checkbox" id="velScaled" checked> Velocity‑scaled brake</label></div>
+        <div><label><input type="checkbox" id="outsideRecover" checked> Outside recovery</label></div>
+        <div><label><input type="checkbox" id="pauseOnAnom" checked> Pause on anomaly</label></div>
+      </div>
+      <div class="row" style="gap:16px; margin-top:6px;">
+        <div class="radio">
+          <span>Resume policy:</span>
+          <label><input type="radio" name="resume" value="nearestApex" checked> nearest apex</label>
+          <label><input type="radio" name="resume" value="center"> center (0°)</label>
+        </div>
+        <div><label><input type="checkbox" id="dragPauses" checked> Pause while dragging</label></div>
+      </div>
+      <div class="small">Drag the dial to set angle; release to let Method 2 take over. Angle 0° is <strong>UP</strong>; ±L are symmetric about UP.</div>
+    </div>
+  </div>
+</header>
+
+<div class="panel" style="margin:12px 16px;">
+  <div class="canvasWrap">
+    <canvas id="dial" width="1000" height="320" title="Drag to set angle (0° = UP)"></canvas>
+  </div>
+  <div class="small">Dial: UP is vertical. The green line is current yaw x (deg from UP, CCW positive). Grey rays mark ±L.</div>
+</div>
+
+<div class="grid">
+  <div class="panel col">
+    <div class="readout mono">
+      <span class="k">x (deg)</span><span id="xV" class="v">0.00</span>
+      <span class="k">v (deg/s)</span><span id="vV" class="v">0.00</span>
+      <span class="k">a_eff (deg/s²)</span><span id="aV" class="v">0.00</span>
+      <span class="k">D<sub>rem</sub> (deg)</span><span id="dremV" class="v">0.00</span>
+      <span class="k">phase</span><span id="phaseV" class="v">accel</span>
+      <span class="k">dir</span><span id="dirV" class="v">+1</span>
+    </div>
+    <div class="canvasWrap">
+      <canvas id="plot1" width="800" height="240"></canvas>
+      <div class="legend" id="legend1">
+        <span class="sw" style="background:#9ab5ff"></span>x (deg)
+        &nbsp;&nbsp;
+        <span class="sw" style="background:#f9d67a"></span>v (deg/s)
+        &nbsp;&nbsp;
+        <span class="sw" style="background:#3b475a"></span>±L (x)
+        &nbsp;&nbsp;
+        <span class="sw" style="background:#705b2a"></span>±V<sub>max</sub> (v)
+      </div>
+    </div>
+    <div class="small">Position (x) and velocity (v). Grey bands mark ±L; brown bands mark ±V<sub>max</sub>.</div>
+  </div>
+
+  <div class="panel col">
+    <div class="readout mono">
+      <span class="k">t (s)</span><span id="tV" class="v">0.00</span>
+      <span class="k">anomaly</span><span id="anomV" class="v">—</span>
+      <span class="k">events</span><span id="evtV" class="v">—</span>
+      <span class="k">mode</span><span id="modeV" class="v">inside</span>
+      <span class="k">target apex</span><span id="apexV" class="v">+L</span>
+      <span class="k">s_stop (deg)</span><span id="sStopV" class="v">0.00</span>
+    </div>
+    <div class="canvasWrap">
+      <canvas id="plot2" width="800" height="240"></canvas>
+    </div>
+    <div class="small">Acceleration (a_eff) and instantaneous stop distance s_stop=v²/(2a_cap). Dots mark sub‑frame landings.</div>
+  </div>
+</div>
+
+<div class="loggrid">
+  <div>
+    <div class="row" style="gap:6px; align-items:center;"><strong>Anomalies</strong><span class="small"> (latest first, with per‑piece trace)</span></div>
+    <div class="btnrow">
+      <button id="copyAnoms" class="alt">Copy</button>
+      <button id="clearAnoms" class="alt">Clear</button>
+    </div>
+    <textarea id="anomsBox" spellcheck="false"></textarea>
+  </div>
+  <div>
+    <div class="row" style="gap:6px; align-items:center;"><strong>Console (captured)</strong><span class="small"> (last N lines)</span></div>
+    <div class="btnrow">
+      <button id="copyLogs" class="alt">Copy</button>
+      <button id="clearLogs" class="alt">Clear</button>
+    </div>
+    <textarea id="logsBox" spellcheck="false"></textarea>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------- Logging ----------
+  const LOG_CAPTURE_ENABLED = true;
+  const LOG_BUFFER_MAX = 1200;
+  // v1.2.6: Set logging to every frame to analyze the issue.
+  const FRAME_LOG_EVERY_N = 1;
+  let frameCounter = 0;
+
+  const logBuffer = [];
+  function pushLog(level, args){
+    if (!LOG_CAPTURE_ENABLED) return;
+    const ts = new Date().toISOString().split('T')[1].replace('Z','');
+    const flat = Array.from(args).map(v => {
+      try{ return (typeof v==='object') ? JSON.stringify(v) : String(v); }
+      catch(e){ return String(v); }
+    }).join(' ');
+    logBuffer.push(`[${ts}] ${level.toUpperCase()}: ${flat}`);
+    if (logBuffer.length > LOG_BUFFER_MAX) logBuffer.shift();
+  }
+  const _orig = { log: console.log, warn: console.warn, error: console.error };
+  console.log  = (...a)=>{ _orig.log.apply(console,a);   pushLog('log',a); };
+  console.warn = (...a)=>{ _orig.warn.apply(console,a);  pushLog('warn',a); };
+  console.error= (...a)=>{ _orig.error.apply(console,a); pushLog('error',a); };
+
+  // ---------- DOM ----------
+  const el = id => document.getElementById(id);
+  const $ = {
+    play: el('play'), step: el('step'), reset: el('reset'),
+    limit: el('limit'), limitV: el('limitV'),
+    vmax: el('vmax'), vmaxV: el('vmaxV'),
+    dt: el('dt'), acap: el('acap'), acapV: el('acapV'),
+    subframe: el('subframe'), velScaled: el('velScaled'),
+    outsideRecover: el('outsideRecover'), pauseOnAnom: el('pauseOnAnom'),
+    dragPauses: el('dragPauses'),
+    xV: el('xV'), vV: el('vV'), aV: el('aV'), dremV: el('dremV'),
+    phaseV: el('phaseV'), dirV: el('dirV'), tV: el('tV'),
+    anomV: el('anomV'), evtV: el('evtV'), modeV: el('modeV'), apexV: el('apexV'),
+    sStopV: el('sStopV'), simState: el('simState'),
+    dial: el('dial'), c1: el('plot1'), c2: el('plot2'),
+    anomsBox: el('anomsBox'), logsBox: el('logsBox'),
+    copyAnoms: el('copyAnoms'), clearAnoms: el('clearAnoms'),
+    copyLogs: el('copyLogs'), clearLogs: el('clearLogs'),
+    legend1: el('legend1')
+  };
+  const ctxD = $.dial.getContext('2d');
+  const ctx1 = $.c1.getContext('2d');
+  const ctx2 = $.c2.getContext('2d');
+
+  // ---------- Sim State ----------
+  const state = {
+    L: +$.limit.value,
+    vmax: +$.vmax.value,
+    acap: +$.acap.value,
+    dt: +$.dt.value/1000,
+    t: 0,
+    x: 0, v: 0, aEff: 0,
+    dir: +1, phase: 'accel',
+    running: false,
+    last: {x:0,v:0,aEff:0,t:0, phase:'accel', aCmd:0},
+    events: [], dots: [],
+    drag: {active:false, wasRunning:false},
+    resumePolicy: 'nearestApex',
+    anomalies: [],
+    aEffHistory: [],
+    frameIndex: 0
+  };
+
+  // ---------- Helpers ----------
+  const clamp = (x,lo,hi)=> Math.max(lo, Math.min(hi, x));
+  const sign = z=> z<0?-1:1;
+  const deg = r=> r*180/Math.PI;
+  const rad = d=> d*Math.PI/180;
+  const norm180 = d=> { let a=d; while(a>180)a-=360; while(a<-180)a+=360; return a; };
+  const stopDistance = (v,a)=> (v*v)/(2*Math.max(1e-6,a));
+
+  // ---------- Planner (Method 2) ----------
+  function planAccel(aCap){
+    const apex = state.dir>0? state.L : -state.L;
+    const dRem = apex - state.x;
+    const inside = Math.abs(state.x) <= state.L;
+
+    // v1.2.6 FIX: Calculate velocity relative to apex.
+    const vToward = state.v * state.dir; // Positive if moving toward apex.
+
+    let aMag, phase, aRaw;
+
+    // v1.2.6 FIX: Enforce I1 Invariant (No-brake-away).
+    // If inside and moving away OR stopped (vToward <= EPS.v), we MUST accelerate.
+    // Using 1e-6 as a practical EPS.v here.
+    //if (inside && vToward < 1e-6) {
+    //    phase = 'accel';
+    //    // Use the standard shaping formula to determine acceleration magnitude
+    //    aRaw = (2*state.vmax*state.vmax - state.v*state.v) / (2*Math.max(1e-5, Math.abs(dRem)));
+    //    aMag = Math.min(aCap, Math.max(1e-5, aRaw));
+    //}
+    //else
+	if (!inside && $.outsideRecover.checked){
+      aRaw = aCap; aMag = aCap; phase = 'decel';
+    }
+	else {
+	  // Moving toward apex (vToward >= 1e-6).
+	  if (Math.abs(state.v) < state.vmax - 1e-6){
+		// Accelerate toward Vmax then decelerate
+		aRaw = (2*state.vmax*state.vmax - state.v*state.v) / (2*Math.max(1e-5, Math.abs(dRem)));
+		aMag = Math.min(aCap, Math.max(1e-5, aRaw));
+		
+		// CHANGED: Use stable acap instead of variable aMag, and add neutral band
+		const dDecelNeed = (state.vmax*state.vmax)/(2*Math.max(1e-6, state.acap));
+		const neutralBand = 0.5; // degrees
+		
+		if (Math.abs(dRem) > dDecelNeed + neutralBand) {
+		  phase = 'accel';
+		} else {
+		  phase = 'decel';  // Commit to deceleration once in braking zone
+		}
+	  } else {
+		// Pure decel (over/at Vmax)
+		aRaw = (state.v*state.v)/(2*Math.max(1e-5, Math.abs(dRem)));
+		aMag = Math.min(aCap, Math.max(1e-5, aRaw));
+		phase = 'decel';
+	  }
+	}
+
+    let a = aMag * (phase==='accel' ? state.dir : -state.dir);
+    if ($.velScaled.checked && phase==='decel'){
+      const overs = Math.max(0, Math.abs(state.v) - state.vmax);
+      if (overs>0){
+        const scale = clamp(1 + overs/(state.vmax+1e-6), 1, 3);
+        // Ensure correct sign application for scaled deceleration
+        a = -state.dir * Math.min(aCap, aMag*scale);
+      }
+    }
+    return {a, aMag, aRaw, phase, apex, dRem, inside};
+  }
+
+  // ---------- Integrator (analytical, consumes dt with splits) ----------
+  function stepConsume(dtTotal){
+    let dtLeft = dtTotal;
+    let apexHit = false;
+    let hitVmax = false;
+    let multiPhase = false;
+    let pieces = [];
+    let vStart = state.v;
+    let plan0 = null;
+
+    while (dtLeft > 1e-9){
+      const plan = planAccel(state.acap);
+      if (!plan0) plan0 = {...plan};
+      state.phase = plan.phase;
+      let a = plan.a;
+      const x0 = state.x, v0 = state.v;
+
+      const aStop = Math.max(1e-6, Math.abs(a));
+      // tStop is only meaningful if v0 is non-zero
+      const tStop = Math.abs(v0)/aStop;
+      const sStop = stopDistance(v0, aStop);
+
+      // v1.2.6 FIX: Determine if we are actively braking (acceleration opposes velocity).
+      // Requires non-negligible velocity.
+      const isBraking = (Math.abs(v0) > 1e-9) && (Math.sign(a) !== Math.sign(v0));
+
+      // v1.2.6 FIX: Refine landing condition based on physics, not planner phase intent.
+      // Landing occurs if we are braking AND the stop distance is sufficient to reach the apex.
+      const willLandAtApex = isBraking && (Math.abs(plan.dRem) <= sStop + 1e-9);
+
+      const targetV = state.dir>0 ? +state.vmax : -state.vmax;
+      const dvToVmax = targetV - v0; // signed
+      // Check if accelerating towards Vmax (must be 'accel' phase and correct direction)
+      const accelTowardTarget = (state.phase==='accel') && (Math.sign(dvToVmax) === Math.sign(a)) && (Math.abs(dvToVmax) > 1e-9);
+      const tToVmax = accelTowardTarget ? Math.abs(dvToVmax) / aStop : Number.POSITIVE_INFINITY;
+      const hitVmaxThisSlice = accelTowardTarget && (tToVmax <= dtLeft + 1e-12);
+
+      // Event prioritization: Land > toV0 > toVmax
+
+      // 1. Land at Apex
+      if ($.subframe.checked && willLandAtApex && tStop <= dtLeft + 1e-9){
+        const used = Math.min(dtLeft, tStop);
+        // land exactly at apex (v→0), then flip
+        state.v = 0; state.x = plan.apex; state.t += used;
+        // Calculate actual acceleration applied over the interval for accurate logging
+        const aActual = (used > 1e-9) ? (state.v - v0) / used : a;
+        pieces.push({note:'land', dt: used, aSigned: aActual, x0, v0, x1: state.x, v1: state.v});
+        state.dots.push({t:state.t, x:state.x});
+        dtLeft -= used; apexHit = true; multiPhase = true;
+        state.dir *= -1; state.phase = 'accel'; // Set phase for the *next* iteration
+        continue;
+      }
+      // v1.2.6 FIX: 2. Implement toV0 (Stop Short)
+      // If braking and tStop is within the slice (and we didn't land, checked above).
+	  else if ($.subframe.checked && isBraking && tStop <= dtLeft + 1e-9) {
+		// We will stop before the apex within this time slice.
+		const used = tStop;
+		// Calculate final position analytically at tStop
+		const x1 = x0 + v0*used + 0.5*a*used*used;
+		state.v = 0;
+		state.x = x1;
+		state.t += used;
+		pieces.push({note:'toV0', dt: used, aSigned: a, x0, v0, x1: state.x, v1: state.v});
+		
+		// NEW: Consume remaining time at rest - we stopped for a reason!
+		if (dtLeft - used > 1e-9) {
+			state.t += (dtLeft - used);
+			pieces.push({note:'rest', dt: dtLeft - used, aSigned: 0, x0: state.x, v0: 0, x1: state.x, v1: 0});
+		}
+		dtLeft = 0;  // All time consumed
+		multiPhase = true;
+		// Don't continue - exit the while loop entirely
+	  }
+      // 3. Reach Vmax
+      else if ($.subframe.checked && hitVmaxThisSlice){
+        const used = Math.min(dtLeft, tToVmax);
+        state.x = x0 + v0*used + 0.5*a*used*used;
+        state.v = targetV; state.t += used;
+        pieces.push({note:'toVmax', dt: used, aSigned:a, x0, v0, x1: state.x, v1: state.v});
+        dtLeft -= used; hitVmax = true; multiPhase = true;
+        continue;
+      }
+      // 4. Full leftover slice
+      else {
+        const xNew = x0 + v0*dtLeft + 0.5*a*dtLeft*dtLeft;
+        const vNew = v0 + a*dtLeft;
+        state.v = vNew; state.x = xNew; state.t += dtLeft;
+        pieces.push({note:'full', dt: dtLeft, aSigned:a, x0, v0, x1: state.x, v1: state.v});
+        // Clamp if needed when sub-frame stop disabled (Safety fallback)
+        const crossed = plan.inside && Math.abs(state.x) > state.L;
+        if (crossed && !$.subframe.checked){
+          state.x = plan.apex; state.v = 0;
+          state.dir *= -1; state.phase='accel';
+          apexHit = true;
+        }
+        dtLeft = 0;
+      }
+    }
+
+    const aEff = (dtTotal > 1e-9) ? (state.v - vStart) / dtTotal : 0;
+    return { apexHit, hitVmax, multiPhase, predicted:{x:state.x, v:state.v}, aEff, dtUsed: dtTotal, pieces, plan0 };
+  }
+
+  // ---------- Anomaly detection (with jerk gating on planned Vmax splits) ----------
+  const DETECT = {
+    jerkLimit: 3500,             // deg/s^3
+    startupIgnoreFrames: 3,
+    cmdDeltaFactorIgnore: 0.85,
+    lateAccelMarginDeg: 0.5,
+    oscWindow: 40, oscFlips: 10, oscAmpMin: 80, oscStartAfterFrames: 12
+  };
+
+  function checkAnomaly(prev, res, dt){
+    if (dt < 1e-9) return; // Skip checks if dt is too small
+
+    const dv = state.v - prev.v;
+    const aEff = res.aEff;
+
+    state.aEffHistory.push(aEff);
+    if (state.aEffHistory.length > DETECT.oscWindow) state.aEffHistory.shift();
+
+    const epsV = Math.max(0.5, 0.02*Math.max(10, Math.abs(state.vmax)));
+    const epsT = 0.004;
+
+    const A_fail = !res.multiPhase && Math.abs(dv - aEff*dt) > epsV;
+    const B_fail = !res.multiPhase && (Math.abs(aEff) > 1e-4 ? Math.abs( (dv/aEff) - dt ) > epsT : false);
+
+    const rV = Math.abs(state.v - res.predicted.v);
+    const rX = Math.abs(state.x - res.predicted.x);
+    const C_fail = rV > epsV || rX > Math.max(1.0, 0.01*state.L);
+
+    const vAbs = Math.abs(state.v);
+    const tooFast = vAbs > 3*state.vmax + 15;
+
+    const aMaxPiece = (res.pieces && res.pieces.length)
+        ? res.pieces.reduce((m,p)=> Math.max(m, Math.abs(p.aSigned||0)), 0)
+        : Math.abs(aEff);
+    const tooAccel = aMaxPiece > (state.acap + 1e-6);
+
+    const dDecelNeedAtCap = (state.vmax*state.vmax)/(2*Math.max(1e-6, state.acap));
+    const dRem0 = res.plan0 ? Math.abs(res.plan0.dRem) : Math.abs((state.dir>0?state.L:-state.L) - prev.x);
+    const lateAccel = res.plan0 ? (res.plan0.inside && res.plan0.phase==='accel' && dRem0 <= dDecelNeedAtCap + DETECT.lateAccelMarginDeg) : false;
+
+    const phaseChange = prev.phase !== state.phase;
+    const aCmd0 = res.plan0 ? res.plan0.a : aEff;
+    const dCmd = Math.abs(aCmd0 - (prev.aCmd ?? aCmd0));
+    const jerk = Math.abs(aEff - prev.aEff) / (dt||1e-6);
+
+    const jerkSpike = (
+      state.frameIndex > DETECT.startupIgnoreFrames &&
+      !res.apexHit &&
+      !res.hitVmax &&                 // suppress when we planned a Vmax split
+      !phaseChange &&
+      dCmd < DETECT.cmdDeltaFactorIgnore * state.acap &&
+      jerk > DETECT.jerkLimit
+    );
+
+    let flips = 0;
+    for (let i=1;i<state.aEffHistory.length;i++){
+      const a0 = state.aEffHistory[i-1], a1 = state.aEffHistory[i];
+      if (Math.sign(a0)!==Math.sign(a1) && Math.max(Math.abs(a0),Math.abs(a1))>DETECT.oscAmpMin) flips++;
+    }
+    const oscillation = (state.frameIndex > DETECT.oscStartAfterFrames) && (flips >= DETECT.oscFlips);
+
+    const crazy = !isFinite(state.x) || !isFinite(state.v) || !isFinite(aEff);
+    const flag = A_fail || B_fail || C_fail || tooFast || tooAccel || lateAccel || jerkSpike || oscillation || crazy;
+
+    if (flag){
+      const apex = state.dir>0 ? state.L : -state.L;
+      const dRem = apex - state.x;
+      const sStop = (state.v*state.v)/(2*Math.max(1e-6, state.acap));
+      const reasons = [];
+      if (A_fail) reasons.push('dv≠a·dt');
+      if (B_fail) reasons.push('(dv/a)≠dt');
+      if (C_fail) reasons.push('predictor‑residual');
+      if (tooFast) reasons.push('tooFast');
+      if (tooAccel) reasons.push('tooAccel');
+      if (lateAccel) reasons.push('late‑accel‑near‑apex');
+      if (jerkSpike) reasons.push('jerk‑spike');
+      if (oscillation) reasons.push('oscillation');
+      if (crazy) reasons.push('NaN/Inf');
+
+      $.anomV.textContent = reasons.join(', ');
+      $.anomV.className = 'v warn';
+
+      const pieceLines = res.pieces.map((p,i)=>`  piece[${i}] note=${p.note} dt=${p.dt.toFixed(6)} a=${p.aSigned.toFixed(3)} x0=${p.x0.toFixed(3)} v0=${p.v0.toFixed(3)} -> x1=${p.x1.toFixed(3)} v1=${p.v1.toFixed(3)}`).join('\n');
+      // Ensure aRaw and aMag are safely accessed
+      const planInfo = res.plan0 ? `plan0: phase=${res.plan0.phase} aRaw=${(res.plan0.aRaw || 0).toFixed(3)} aMag=${(res.plan0.aMag || 0).toFixed(3)} aChosen=${res.plan0.a.toFixed(3)} dRem0=${res.plan0.dRem.toFixed(3)} inside=${res.plan0.inside}` : '';
+      const line = `[ANOM] t=${state.t.toFixed(6)} x=${state.x.toFixed(3)} v=${state.v.toFixed(3)} aEff=${aEff.toFixed(3)} aMaxCmd=${aMaxPiece.toFixed(3)} L=${state.L}`
+                  + ` dir=${state.dir} phase=${state.phase} dRem=${dRem.toFixed(3)} sStop=${sStop.toFixed(3)} reasons=${reasons.join('|')}\n${planInfo}\n${pieceLines}`;
+      console.warn(line);
+      state.anomalies.unshift(line);
+      if (state.anomalies.length>500) state.anomalies.pop();
+      renderTextBoxes();
+      if ($.pauseOnAnom.checked){ pause(); }
+    } else {
+      $.anomV.textContent = '—';
+      $.anomV.className = 'v';
+    }
+  }
+
+  function renderTextBoxes(){
+    $.logsBox.value = logBuffer.slice(-LOG_BUFFER_MAX).join('\n');
+    // Scroll logs to bottom
+    $.logsBox.scrollTop = $.logsBox.scrollHeight;
+    $.anomsBox.value = state.anomalies.join('\n\n');
+  }
+
+  // ---------- Rendering ----------
+  function paint(all){
+    drawDial();
+    drawPlots(all);
+    const apex = state.dir>0 ? state.L : -state.L;
+    $.xV.textContent = state.x.toFixed(2);
+    $.vV.textContent = state.v.toFixed(2);
+    $.aV.textContent = state.aEff.toFixed(2);
+    $.dremV.textContent = (apex - state.x).toFixed(2);
+    $.phaseV.textContent = state.phase;
+    $.dirV.textContent = state.dir>0?'+1':'-1';
+    $.tV.textContent = state.t.toFixed(3); // Increased precision for t
+    $.limitV.textContent = state.L.toFixed(0);
+    $.vmaxV.textContent = state.vmax.toFixed(0);
+    $.acapV.textContent = state.acap.toFixed(0);
+    $.modeV.textContent = Math.abs(state.x)<=state.L ? 'inside':'outside';
+    $.apexV.textContent = state.dir>0?'+L':'-L';
+    $.sStopV.textContent = (state.v*state.v)/(2*Math.max(1e-6,state.acap)).toFixed(2);
+  }
+
+  function drawDial(){
+    const w=$.dial.width, h=$.dial.height;
+    const cx=w/2, cy=h/2, R=Math.min(w,h)*0.32;
+    ctxD.clearRect(0,0,w,h);
+    // ring
+    ctxD.save();
+    ctxD.translate(cx,cy);
+    ctxD.strokeStyle='#273041'; ctxD.lineWidth=10;
+    ctxD.beginPath(); ctxD.arc(0,0,R,0,Math.PI*2); ctxD.stroke();
+    ctxD.restore();
+    // UP marker
+    ctxD.fillStyle='#cbd5e1'; ctxD.beginPath();
+    ctxD.arc(cx, cy - R - 14, 6, 0, Math.PI*2); ctxD.fill();
+    ctxD.font='12px system-ui'; ctxD.textAlign = 'center';
+    ctxD.fillText('UP', cx, cy - R - 22);
+    // rays at ±L relative to UP (UP=0°)
+    const ray = (angleFromUp, color, dash)=>{
+      const a = rad(angleFromUp - 90);
+      const dx=Math.cos(a)*R, dy=Math.sin(a)*R;
+      ctxD.save(); ctxD.setLineDash(dash||[]); ctxD.strokeStyle=color; ctxD.lineWidth=2;
+      ctxD.beginPath(); ctxD.moveTo(cx,cy); ctxD.lineTo(cx+dx, cy+dy); ctxD.stroke();
+      ctxD.restore();
+    };
+    ray(+state.L, '#3b475a', [6,6]);
+    ray(-state.L, '#3b475a', [6,6]);
+    // current yaw line
+    const a = rad(state.x - 90);
+    const dx=Math.cos(a)*R, dy=Math.sin(a)*R;
+    ctxD.strokeStyle='#6cf09a'; ctxD.lineWidth=4; ctxD.beginPath();
+    ctxD.moveTo(cx,cy); ctxD.lineTo(cx+dx, cy+dy); ctxD.stroke();
+  }
+
+  let trails=[];
+  function drawPlots(all){
+    const w1=$.c1.width, h1=$.c1.height;
+    const w2=$.c2.width, h2=$.c2.height;
+    if(all){ ctx1.clearRect(0,0,w1,h1); ctx2.clearRect(0,0,w2,h2); }
+    else { ctx1.fillStyle='rgba(11,13,16,0.20)'; ctx1.fillRect(0,0,w1,h1);
+           ctx2.fillStyle='rgba(11,13,16,0.20)'; ctx2.fillRect(0,0,w2,h2); }
+    // Increase time window T for better visibility with large dt
+    const T=5.0, t0=Math.max(0, state.t-T);
+    function tX(t,w){ return (t - t0)/T * w; }
+    const maxAbsX = state.L*1.2 + 10;
+    const maxAbsV = Math.max(30, state.vmax*1.5);
+    const maxAbsA = Math.max(100, state.acap*1.2);
+    const yX = (x,h)=> h*0.5 - (x/maxAbsX)*h*0.45;
+    const yV = (v,h)=> h*0.5 - (v/maxAbsV)*h*0.45;
+    const yA = (a,h)=> h*0.5 - (a/maxAbsA)*h*0.45;
+
+    // bands for ±L (x-scale)
+    ctx1.strokeStyle='#3b475a'; ctx1.lineWidth=1;
+    ctx1.beginPath(); ctx1.moveTo(0,yX(+state.L,h1)); ctx1.lineTo(w1,yX(+state.L,h1));
+    ctx1.moveTo(0,yX(-state.L,h1)); ctx1.lineTo(w1,yX(-state.L,h1)); ctx1.stroke();
+    // bands for ±Vmax (v-scale)
+    ctx1.strokeStyle='#705b2a'; ctx1.lineWidth=1;
+    ctx1.beginPath(); ctx1.moveTo(0,yV(+state.vmax,h1)); ctx1.lineTo(w1,yV(+state.vmax,h1));
+    ctx1.moveTo(0,yV(-state.vmax,h1)); ctx1.lineTo(w1,yV(-state.vmax,h1)); ctx1.stroke();
+
+    // samples
+    trails.push({t:state.t, x:state.x, v:state.v, a:state.aEff});
+    while(trails.length && trails[0].t < t0) trails.shift();
+
+    // x
+    ctx1.strokeStyle='#9ab5ff'; ctx1.beginPath();
+    trails.forEach((p,i)=>{ const X=tX(p.t,w1), Y=yX(p.x,h1); if(i===0) ctx1.moveTo(X,Y); else ctx1.lineTo(X,Y); }); ctx1.stroke();
+    // v
+    ctx1.strokeStyle='#f9d67a'; ctx1.beginPath();
+    trails.forEach((p,i)=>{ const X=tX(p.t,w1), Y=yV(p.v,h1); if(i===0) ctx1.moveTo(X,Y); else ctx1.lineTo(X,Y); }); ctx1.stroke();
+
+    // Accel plot
+    ctx2.strokeStyle='#c0ffee'; ctx2.beginPath();
+    trails.forEach((p,i)=>{ const X=tX(p.t,w2), Y=yA(p.a,h2); if(i===0) ctx2.moveTo(X,Y); else ctx2.lineTo(X,Y); }); ctx2.stroke();
+    // s_stop
+    ctx2.strokeStyle='#8b949e'; ctx2.beginPath();
+    trails.forEach((p,i)=>{ const s=(p.v*p.v)/(2*Math.max(1e-6,state.acap)); const X=tX(p.t,w2), Y=yA(s,h2); if(i===0) ctx2.moveTo(X,Y); else ctx2.lineTo(X,Y); }); ctx2.stroke();
+
+    // dots
+    ctx1.fillStyle='#7ee787';
+    // Filter dots to current window
+    state.dots = state.dots.filter(d => d.t >= t0);
+    state.dots.forEach(d=>{ const X=tX(d.t,w1), Y=yX(d.x,h1); ctx1.beginPath(); ctx1.arc(X,Y,3,0,Math.PI*2); ctx1.fill(); });
+  }
+
+  // ---------- Frame loop ----------
+  function frame(){
+    if(!state.running) return;
+    const prev = {...state.last};
+    const res = stepConsume(state.dt);
+    state.aEff = res.aEff;
+    state.last = {x:state.x, v:state.v, aEff:state.aEff, t:state.t, phase:state.phase, aCmd: res.plan0 ? res.plan0.a : state.aEff};
+    checkAnomaly(prev, res, state.dt);
+    paint(false);
+
+    state.frameIndex++;
+
+    if (++frameCounter % FRAME_LOG_EVERY_N === 0){
+      const apex = state.dir>0? state.L : -state.L;
+      const dRem = apex - state.x;
+      const events = res.pieces.map(p => p.note).join('|') || '-';
+      console.log(`[FRAME] t=${state.t.toFixed(3)} x=${state.x.toFixed(2)} v=${state.v.toFixed(2)} aEff=${state.aEff.toFixed(2)} L=${state.L} dir=${state.dir} phase=${state.phase} dRem=${dRem.toFixed(2)} events=${events}`);
+      renderTextBoxes();
+    }
+
+    // Update event visualization
+    const eventNotes = res.pieces.map(p => p.note).filter(n => n !== 'full');
+    if (res.apexHit) eventNotes.push('apexHit(flip)');
+    $.evtV.textContent = eventNotes.length ? eventNotes.join('|') : '—';
+
+    requestAnimationFrame(frame);
+  }
+  function play(){ if(state.running) return; state.running=true; $.simState.textContent='running'; $.play.textContent='❚❚ Pause'; requestAnimationFrame(frame); }
+  function pause(){ state.running=false; $.simState.textContent='paused'; $.play.textContent='▶︎ Play'; }
+
+  // ---------- UI ----------
+  $.play.addEventListener('click', ()=> state.running? pause(): play());
+  $.step.addEventListener('click', ()=> { if (state.running) return;
+    const prev={...state.last}; const res=stepConsume(state.dt);
+    state.aEff=res.aEff; state.last={x:state.x,v:state.v,aEff:state.aEff,t:state.t, phase:state.phase, aCmd: res.plan0 ? res.plan0.a : state.aEff};
+    checkAnomaly(prev, res, state.dt); paint(false); renderTextBoxes();
+    // Update event visualization for steps
+    const eventNotes = res.pieces.map(p => p.note).filter(n => n !== 'full');
+    if (res.apexHit) eventNotes.push('apexHit(flip)');
+    $.evtV.textContent = eventNotes.length ? eventNotes.join('|') : '—';
+  });
+
+  $.reset.addEventListener('click', ()=>{ state.t=0; state.x=0; state.v=0; state.aEff=0; state.dir=+1; state.phase='accel';
+    state.last={x:0,v:0,aEff:0,t:0,phase:'accel',aCmd:0}; state.events.length=0; state.dots.length=0; state.aEffHistory.length=0;
+    state.frameIndex=0; trails.length=0; $.anomV.textContent='—'; $.anomV.className='v'; paint(true); $.evtV.textContent='—'; });
+
+  $.limit.addEventListener('input', e=>{ state.L=+e.target.value; paint(false); });
+  $.vmax.addEventListener('input', e=>{ state.vmax=+e.target.value; });
+  $.acap.addEventListener('input', e=>{ state.acap=+e.target.value; });
+  $.dt.addEventListener('change', e=>{ state.dt=+e.target.value/1000; });
+
+  // Pointer mapping (0° = UP)
+  function canvasToAngleFromUp(ev){
+    const rect=$.dial.getBoundingClientRect();
+    const x = ev.clientX - rect.left;
+    const y = ev.clientY - rect.top;
+    const ax = x * ($.dial.width/rect.width), ay = y * ($.dial.height/rect.height);
+    const cx=$.dial.width/2, cy=$.dial.height/2;
+    const ang = Math.atan2(ay - cy, ax - cx) * 180/Math.PI;
+    return ((ang + 90 + 540) % 360) - 180; // 0 at UP
+  }
+
+  $.dial.addEventListener('pointerdown', (e)=>{
+    $.dial.setPointerCapture(e.pointerId);
+    state.drag.active=true;
+    state.drag.wasRunning = state.running;
+    if ($.dragPauses.checked) pause();
+  });
+  $.dial.addEventListener('pointermove', (e)=>{
+    if (!state.drag.active) return;
+    state.x = canvasToAngleFromUp(e);
+    state.v=0; state.phase='accel';
+    paint(false);
+  });
+  $.dial.addEventListener('pointerup', (e)=>{
+    if (!state.drag.active) return;
+    state.drag.active=false;
+    $.dial.releasePointerCapture(e.pointerId);
+
+    // Update resume policy from radio buttons
+    state.resumePolicy = document.querySelector('input[name="resume"]:checked').value;
+
+    if (state.resumePolicy === 'center'){
+      if (Math.abs(state.x) > 1e-6) state.dir = sign(0 - state.x);
+    } else {
+      const dPlus = Math.abs(state.L - state.x), dMinus= Math.abs(-state.L - state.x);
+      state.dir = dPlus <= dMinus ? +1 : -1;
+    }
+    state.v = 0; state.phase='accel';
+    if (state.drag.wasRunning) play(); else paint(false);
+  });
+
+  $.copyAnoms.addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText($.anomsBox.value); }catch(e){ console.warn('Clipboard failed', e);} });
+  $.clearAnoms.addEventListener('click', ()=>{ state.anomalies.length=0; renderTextBoxes(); });
+  $.copyLogs.addEventListener('click', async ()=>{ try{ await navigator.clipboard.writeText($.logsBox.value); }catch(e){ console.warn('Clipboard failed', e);} });
+  $.clearLogs.addEventListener('click', ()=>{ logBuffer.length=0; renderTextBoxes(); });
+
+  // Init
+  $.anomV.textContent = '—';
+  console.log('[INIT] v1.2.6 fix build loaded (Robust toV0 + Full I1 enforcement)');
+  // Ensure state reflects the default dt input value on load
+  state.dt = +$.dt.value/1000;
+  paint(true);
+  renderTextBoxes();
+})();
+</script>
+</body>
+</html>

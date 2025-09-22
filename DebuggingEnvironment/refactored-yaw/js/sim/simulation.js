@@ -12,6 +12,8 @@ const DEFAULT_EPS = {
   sel: 0.5,
 };
 
+const DEBUG_STAGES = true;
+
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const abs = Math.abs;
 
@@ -62,6 +64,14 @@ function timeToV0(v0, a, epsT) {
   return t > epsT ? t : Infinity;
 }
 
+function timeToVmax(v0, a, vmax, epsT) {
+  if (Math.abs(a) < 1e-12) return Infinity;
+  const target = a > 0 ? vmax : -vmax;
+  if ((target - v0) * a <= 0) return Infinity;
+  const t = (target - v0) / a;
+  return t > epsT ? t : Infinity;
+}
+
 function selectStage(state, params, eps, options) {
   const { x, v, phase, side, prevStage } = state;
   const { L, aCap } = params;
@@ -80,32 +90,65 @@ function selectStage(state, params, eps, options) {
   const target = phase === 'toLimit' ? side * L : 0;
   const dTow = abs(target - x);
   const dBrake = stopDistance(v, aCap);
+  const towardSign = phase === 'toLimit'
+    ? (side >= 0 ? 1 : -1)
+    : (Math.sign(target - x) || (target >= x ? 1 : -1));
+  const vToward = v * towardSign;
 
-  if (abs(v) <= eps.v) {
-    const toward = Math.sign(target - x) || 1;
-    return { stage: 'accel', target, a: toward * aCap, dTow, dBrake };
+  if (vToward <= eps.v) {
+    return { stage: 'accel', target, a: towardSign * aCap, dTow, dBrake };
   }
 
   const band = eps.sel;
   const preferDecel = dBrake > dTow + band;
   const preferAccel = dBrake < dTow - band;
 
+  let stageResult;
+  let stageKind;
   if (preferDecel) {
-    const againstV = -Math.sign(v) || (target >= x ? 1 : -1);
-    return { stage: 'decel', target, a: againstV * aCap, dTow, dBrake };
+    const againstV = -Math.sign(v) || -towardSign;
+    stageResult = { stage: 'decel', target, a: againstV * aCap, dTow, dBrake };
+    stageKind = 'decel';
   }
-  if (preferAccel) {
-    const toward = Math.sign(target - x) || 1;
-    return { stage: 'accel', target, a: toward * aCap, dTow, dBrake };
+  else if (preferAccel) {
+    stageResult = { stage: 'accel', target, a: towardSign * aCap, dTow, dBrake };
+    stageKind = 'accel';
+  }
+  else {
+    const stick = prevStage === 'accel' ? 'accel' : 'decel';
+    if (stick === 'accel') {
+      stageResult = { stage: 'accel', target, a: towardSign * aCap, dTow, dBrake };
+      stageKind = 'accel';
+    } else {
+      const againstV = -Math.sign(v) || -towardSign;
+      stageResult = { stage: 'decel', target, a: againstV * aCap, dTow, dBrake };
+      stageKind = 'decel';
+    }
   }
 
-  const stick = prevStage === 'accel' ? 'accel' : 'decel';
-  if (stick === 'accel') {
-    const toward = Math.sign(target - x) || 1;
-    return { stage: 'accel', target, a: toward * aCap, dTow, dBrake };
+  if (stageResult.stage === 'accel' && vToward >= params.vmax - eps.v) {
+    stageResult = { ...stageResult, stage: 'coast', a: 0 };
+    stageKind = 'accel';
   }
-  const againstV = -Math.sign(v) || (target >= x ? 1 : -1);
-  return { stage: 'decel', target, a: againstV * aCap, dTow, dBrake };
+
+  if (DEBUG_STAGES && state.t < 0.4) {
+    console.log('[STAGE]', {
+      t: state.t.toFixed(4),
+      x: state.x.toFixed(3),
+      v: state.v.toFixed(3),
+      phase,
+      side,
+      dTow: dTow.toFixed(3),
+      dBrake: dBrake.toFixed(3),
+      vToward: vToward.toFixed(3),
+      stage: stageResult.stage,
+      a: stageResult.a.toFixed(3),
+      prevStage,
+      stageKind,
+    });
+  }
+
+  return stageResult;
 }
 
 function applyVelocityScaling(stage, state, params, options) {
@@ -146,11 +189,13 @@ function stepWithEvents(state, params, eps, options, dt) {
     const stageInfo = { ...pick, a, inside, dRem: dRemCurrent };
     if (!firstStage) firstStage = stageInfo;
     lastStage = stageInfo;
+    const hysteresisStage = pick.stage === 'coast' ? 'accel' : pick.stage;
     state.stage = pick.stage;
     state.a = a;
 
     const tTarget = Number.isFinite(pick.target) ? timeToX(state.x, state.v, a, pick.target, eps.t) : Infinity;
     const tStop = timeToV0(state.v, a, eps.t);
+    const tVmax = timeToVmax(state.v, a, params.vmax, eps.t);
     const tLimitPlus = timeToX(state.x, state.v, a, +params.L, eps.t);
     const tLimitMinus = timeToX(state.x, state.v, a, -params.L, eps.t);
     const tLand = Math.min(tLimitPlus, tLimitMinus);
@@ -160,6 +205,7 @@ function stepWithEvents(state, params, eps, options, dt) {
 
     if (tLand < evtTime - eps.t / 2) { evtTime = tLand; evt = 'land'; }
     if (tStop < evtTime - eps.t / 2) { evtTime = tStop; evt = 'toV0'; }
+    if (tVmax < evtTime - eps.t / 2) { evtTime = tVmax; evt = 'toVmax'; }
     if (tTarget < evtTime - eps.t / 2) { evtTime = tTarget; evt = 'target'; }
 
     const tPiece = Math.min(dtLeft, evtTime);
@@ -168,7 +214,7 @@ function stepWithEvents(state, params, eps, options, dt) {
     dtLeft -= tPiece;
 
     let note = 'full';
-    if (evt && evtTime <= tPiece - eps.t / 2) {
+    if (evt && evtTime - tPiece <= eps.t) {
       note = evt;
       if (evt === 'land') {
         state.x = clamp(state.x, -params.L, params.L);
@@ -178,6 +224,10 @@ function stepWithEvents(state, params, eps, options, dt) {
       } else if (evt === 'toV0') {
         state.v = 0;
         events.push('toV0');
+      } else if (evt === 'toVmax') {
+        const sign = a >= 0 ? 1 : -1;
+        state.v = sign * params.vmax;
+        events.push('toVmax');
       } else if (evt === 'target') {
         state.x = pick.target;
         state.v = 0;
@@ -189,13 +239,13 @@ function stepWithEvents(state, params, eps, options, dt) {
         }
         events.push('target');
       }
-      state.prevStage = state.stage;
+      state.prevStage = hysteresisStage;
       pieces.push({ note, dt: tPiece, aSigned: a, ...span, x1: state.x, v1: state.v });
       continue;
     }
 
     pieces.push({ note, dt: tPiece, aSigned: a, ...span });
-    state.prevStage = state.stage;
+    state.prevStage = hysteresisStage;
   }
 
   const dtUsed = dt - dtLeft;

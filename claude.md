@@ -8,3 +8,4 @@
 ### List out ways in which you could be wrong, and try to determine if you can solidify your conclusions in these areas.
 ## In summary, I would much prefer you consider the problem from 2-3 different angles, and compare your results, before making and proposal or code changes — even if that takes 2-3 times as long.
 
+# Please also read DebuggingEnvironment/AIchats/01-2025-09-22 935 AM ai-coding-instructions.md

@@ -440,7 +440,9 @@ function checkAnomaly(prevSnapshot, prevStep, result, dt) {
     (uiState.frameIndex > DETECT.startupIgnoreFrames) &&
     !result.events.includes('land') &&
     !result.events.includes('toV0') &&
+    !result.events.includes('toVmax') &&
     !phaseChange &&
+    (!result.stage || result.stage.stage !== 'coast') &&
     dCmd < DETECT.cmdDeltaFactorIgnore * params.aCap &&
     jerk > DETECT.jerkLimit;
 

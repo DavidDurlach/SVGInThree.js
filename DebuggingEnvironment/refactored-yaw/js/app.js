@@ -90,10 +90,22 @@ const uiState = {
   trails: [],
   dots: [],
   anomalies: [],
+  aEffHistory: [],
   frameIndex: 0,
   resumePolicy: document.querySelector('input[name="resume"]:checked').value,
   lastSnapshot: sim.getSnapshot(),
   lastStep: sim.getLastStep(),
+};
+
+const DETECT = {
+  jerkLimit: 3500,
+  startupIgnoreFrames: 3,
+  cmdDeltaFactorIgnore: 0.85,
+  lateAccelMarginDeg: 0.5,
+  oscWindow: 40,
+  oscFlips: 10,
+  oscAmpMin: 80,
+  oscStartAfterFrames: 12,
 };
 
 // ---------- Helpers ----------
@@ -112,6 +124,23 @@ function updateOptionsFromUI() {
     velScaled: $.velScaled.checked,
     outsideRecover: $.outsideRecover.checked,
   });
+}
+
+function cloneSnapshot(snapshot) {
+  return snapshot ? { ...snapshot } : null;
+}
+
+function cloneStep(step) {
+  if (!step) return null;
+  return {
+    aEff: step.aEff ?? 0,
+    dt: step.dt ?? 0,
+    sStop: step.sStop ?? 0,
+    stage: step.stage ? { ...step.stage } : null,
+    firstStage: step.firstStage ? { ...step.firstStage } : null,
+    pieces: step.pieces ? step.pieces.map(p => ({ ...p })) : [],
+    events: step.events ? [...step.events] : [],
+  };
 }
 
 function updateHeaderLabels() {
@@ -346,28 +375,126 @@ function handleEvents(result) {
   }
 }
 
-function checkAnomaly(result) {
-  const { snapshot, params } = computeDerived();
-  const bad = !Number.isFinite(snapshot.x) || !Number.isFinite(snapshot.v) || !Number.isFinite(result.aEff);
-  if (bad) {
-    const line = `[ANOM] t=${snapshot.t.toFixed(6)} x=${snapshot.x.toFixed(3)} v=${snapshot.v.toFixed(3)} aEff=${result.aEff.toFixed(3)} L=${params.L}`;
-    uiState.anomalies.unshift(line);
-    if (uiState.anomalies.length > 500) uiState.anomalies.pop();
-    $.anomV.textContent = 'non-finite state';
-    $.anomV.className = 'v warn';
-    if ($.pauseOnAnom.checked) pause();
-    renderTextBoxes();
-  } else {
+function checkAnomaly(prevSnapshot, prevStep, result, dt) {
+  if (!result || !prevSnapshot) {
     $.anomV.textContent = '—';
     $.anomV.className = 'v';
+    return;
   }
+
+  const { snapshot, params } = computeDerived();
+  const aEff = result.aEff;
+  const dv = snapshot.v - prevSnapshot.v;
+  const multiPhase = !!result.multiPhase;
+
+  const epsV = Math.max(0.5, 0.02 * Math.max(10, Math.abs(params.vmax)));
+  const epsT = 0.004;
+
+  const A_fail = !multiPhase && Math.abs(dv - aEff * dt) > epsV;
+  const B_fail = !multiPhase && (Math.abs(aEff) > 1e-4 ? Math.abs((dv / aEff) - dt) > epsT : false);
+
+  const predicted = result.predicted || { x: snapshot.x, v: snapshot.v };
+  const rV = Math.abs(snapshot.v - predicted.v);
+  const rX = Math.abs(snapshot.x - predicted.x);
+  const C_fail = rV > epsV || rX > Math.max(1.0, 0.01 * params.L);
+
+  const vAbs = Math.abs(snapshot.v);
+  const tooFast = vAbs > 3 * params.vmax + 15;
+
+  const aMaxPiece = result.pieces && result.pieces.length
+    ? result.pieces.reduce((m, p) => Math.max(m, Math.abs(p.aSigned || 0)), 0)
+    : Math.abs(aEff);
+  const tooAccel = aMaxPiece > (params.aCap + 1e-6);
+
+  const dDecelNeedAtCap = (params.vmax * params.vmax) / (2 * Math.max(1e-6, params.aCap));
+  const firstStage = result.firstStage;
+  let dRem0 = Math.abs((prevSnapshot.phase === 'toLimit' ? prevSnapshot.side * params.L : 0) - prevSnapshot.x);
+  let lateAccel = false;
+  if (firstStage) {
+    const dRemCandidate = Math.abs(firstStage.dRem ?? (firstStage.target - prevSnapshot.x));
+    dRem0 = dRemCandidate;
+    lateAccel = (firstStage.inside ?? true) && firstStage.stage === 'accel' && dRem0 <= dDecelNeedAtCap + DETECT.lateAccelMarginDeg;
+  }
+
+  const phaseChange = prevSnapshot.phase !== snapshot.phase;
+  const prevACmd = prevStep && prevStep.stage ? (prevStep.stage.a ?? 0) : 0;
+  const aCmd0 = firstStage ? firstStage.a : (result.stage ? result.stage.a : 0);
+  const dCmd = Math.abs(aCmd0 - prevACmd);
+  const prevAEff = prevStep ? (prevStep.aEff ?? 0) : 0;
+  const jerk = Math.abs(aEff - prevAEff) / (dt || 1e-6);
+
+  uiState.aEffHistory.push(aEff);
+  if (uiState.aEffHistory.length > DETECT.oscWindow) uiState.aEffHistory.shift();
+
+  let flips = 0;
+  for (let i = 1; i < uiState.aEffHistory.length; i++) {
+    const a0 = uiState.aEffHistory[i - 1];
+    const a1 = uiState.aEffHistory[i];
+    if (Math.sign(a0) !== Math.sign(a1) && Math.max(Math.abs(a0), Math.abs(a1)) > DETECT.oscAmpMin) {
+      flips++;
+    }
+  }
+  const oscillation = (uiState.frameIndex > DETECT.oscStartAfterFrames) && (flips >= DETECT.oscFlips);
+
+  const jerkSpike =
+    (uiState.frameIndex > DETECT.startupIgnoreFrames) &&
+    !result.events.includes('land') &&
+    !result.events.includes('toV0') &&
+    !phaseChange &&
+    dCmd < DETECT.cmdDeltaFactorIgnore * params.aCap &&
+    jerk > DETECT.jerkLimit;
+
+  const crazy = !Number.isFinite(snapshot.x) || !Number.isFinite(snapshot.v) || !Number.isFinite(aEff);
+
+  const flag = A_fail || B_fail || C_fail || tooFast || tooAccel || lateAccel || jerkSpike || oscillation || crazy;
+
+  if (!flag) {
+    $.anomV.textContent = '—';
+    $.anomV.className = 'v';
+    return;
+  }
+
+  const dir = snapshot.phase === 'toLimit' ? (snapshot.side >= 0 ? +1 : -1) : (snapshot.x >= 0 ? -1 : 1);
+  const apexTarget = snapshot.phase === 'toLimit' ? snapshot.side * params.L : 0;
+  const dRem = apexTarget - snapshot.x;
+  const sStop = result.sStop;
+  const reasons = [];
+  if (A_fail) reasons.push('dv≠a·dt');
+  if (B_fail) reasons.push('(dv/a)≠dt');
+  if (C_fail) reasons.push('predictor-residual');
+  if (tooFast) reasons.push('tooFast');
+  if (tooAccel) reasons.push('tooAccel');
+  if (lateAccel) reasons.push('late-accel-near-apex');
+  if (jerkSpike) reasons.push('jerk-spike');
+  if (oscillation) reasons.push('oscillation');
+  if (crazy) reasons.push('NaN/Inf');
+
+  const pieceLines = (result.pieces || []).map((p, i) =>
+    `  piece[${i}] note=${p.note} dt=${p.dt.toFixed(6)} a=${(p.aSigned ?? 0).toFixed(3)} x0=${p.x0.toFixed(3)} v0=${p.v0.toFixed(3)} -> x1=${p.x1.toFixed(3)} v1=${p.v1.toFixed(3)}`
+  ).join('\\n');
+
+  const planInfo = firstStage
+    ? `plan0: stage=${firstStage.stage} a=${(firstStage.a ?? 0).toFixed(3)} dTow=${(firstStage.dTow ?? 0).toFixed(3)} dBrake=${(firstStage.dBrake ?? 0).toFixed(3)} inside=${firstStage.inside ? 'true' : 'false'} dRem=${(firstStage.dRem ?? 0).toFixed(3)}`
+    : 'plan0: n/a';
+
+  const line = `[ANOM] t=${snapshot.t.toFixed(6)} x=${snapshot.x.toFixed(3)} v=${snapshot.v.toFixed(3)} aEff=${aEff.toFixed(3)} aMax=${aMaxPiece.toFixed(3)} L=${params.L}` +
+    ` dir=${dir} phase=${snapshot.phase} dRem=${dRem.toFixed(3)} sStop=${sStop.toFixed(3)} reasons=${reasons.join('|')}\\n${planInfo}` +
+    (pieceLines ? `\\n${pieceLines}` : '');
+
+  console.warn(line);
+  uiState.anomalies.unshift(line);
+  if (uiState.anomalies.length > 500) uiState.anomalies.pop();
+  $.anomV.textContent = reasons.join(', ');
+  $.anomV.className = 'v warn';
+  renderTextBoxes();
+  if ($.pauseOnAnom.checked) pause();
 }
 
-function applyStep(result) {
+function applyStep(result, prevSnapshot, prevStep, dt) {
   uiState.lastStep = result;
   uiState.lastSnapshot = sim.getSnapshot();
   handleEvents(result);
-  checkAnomaly(result);
+  checkAnomaly(prevSnapshot, prevStep, result, dt);
   paint(false);
   renderTextBoxes();
   uiState.frameIndex += 1;
@@ -379,9 +506,11 @@ function frame() {
   if (!uiState.running) return;
   updateParamsFromUI();
   updateOptionsFromUI();
+  const prevSnapshot = cloneSnapshot(uiState.lastSnapshot);
+  const prevStep = cloneStep(uiState.lastStep);
   const dt = sim.getParams().dt;
   const result = sim.step(dt);
-  applyStep(result);
+  applyStep(result, prevSnapshot, prevStep, dt);
   requestAnimationFrame(frame);
 }
 
@@ -409,9 +538,11 @@ $.step.addEventListener('click', () => {
   if (uiState.running) return;
   updateParamsFromUI();
   updateOptionsFromUI();
+  const prevSnapshot = cloneSnapshot(uiState.lastSnapshot);
+  const prevStep = cloneStep(uiState.lastStep);
   const dt = sim.getParams().dt;
   const result = sim.step(dt);
-  applyStep(result);
+  applyStep(result, prevSnapshot, prevStep, dt);
 });
 
 $.reset.addEventListener('click', () => {
@@ -422,6 +553,7 @@ $.reset.addEventListener('click', () => {
   uiState.trails.length = 0;
   uiState.dots.length = 0;
   uiState.anomalies.length = 0;
+  uiState.aEffHistory.length = 0;
   uiState.frameIndex = 0;
   uiState.lastStep = sim.getLastStep();
   uiState.lastSnapshot = sim.getSnapshot();

@@ -134,14 +134,19 @@ function stepWithEvents(state, params, eps, options, dt) {
   const events = [];
   let guard = 0;
   let lastStage = null;
+  let firstStage = null;
+  let predicted = null;
   const vStart = state.v;
 
   while (dtLeft > eps.t && guard++ < 32) {
     const pick = selectStage(state, params, eps, options);
-    lastStage = pick;
-    state.stage = pick.stage;
-
+    const inside = Math.abs(state.x) <= params.L + eps.x;
+    const dRemCurrent = pick.target - state.x;
     const a = applyVelocityScaling(pick, state, params, options);
+    const stageInfo = { ...pick, a, inside, dRem: dRemCurrent };
+    if (!firstStage) firstStage = stageInfo;
+    lastStage = stageInfo;
+    state.stage = pick.stage;
     state.a = a;
 
     const tTarget = Number.isFinite(pick.target) ? timeToX(state.x, state.v, a, pick.target, eps.t) : Infinity;
@@ -159,6 +164,7 @@ function stepWithEvents(state, params, eps, options, dt) {
 
     const tPiece = Math.min(dtLeft, evtTime);
     const span = integratePiece(state, a, tPiece);
+    predicted = { x: span.x1, v: span.v1 };
     dtLeft -= tPiece;
 
     let note = 'full';
@@ -195,19 +201,26 @@ function stepWithEvents(state, params, eps, options, dt) {
   const dtUsed = dt - dtLeft;
   const aEff = dtUsed > eps.t ? (state.v - vStart) / dtUsed : 0;
 
+  const multiPhase = pieces.length > 1 || pieces.some(p => p.note !== 'full');
+
   return {
     dt: dtUsed,
     pieces,
     events,
     stage: lastStage,
+    firstStage,
     aEff,
     sStop: stopDistance(state.v, params.aCap),
     exhausted: dtLeft <= eps.t,
+    predicted: predicted || { x: state.x, v: state.v },
+    multiPhase,
   };
 }
 
 function stepWithoutEvents(state, params, eps, options, dt) {
   const pick = selectStage(state, params, eps, options);
+  const inside = Math.abs(state.x) <= params.L + eps.x;
+  const dRemCurrent = pick.target - state.x;
   state.stage = pick.stage;
   const a = applyVelocityScaling(pick, state, params, options);
   state.a = a;
@@ -218,10 +231,13 @@ function stepWithoutEvents(state, params, eps, options, dt) {
     dt,
     pieces: [{ note: 'full', dt, aSigned: a, ...span }],
     events: [],
-    stage: pick,
+    stage: { ...pick, a, inside, dRem: dRemCurrent },
+    firstStage: { ...pick, a, inside, dRem: dRemCurrent },
     aEff,
     sStop: stopDistance(state.v, params.aCap),
     exhausted: true,
+    predicted: { x: span.x1, v: span.v1 },
+    multiPhase: false,
   };
 }
 

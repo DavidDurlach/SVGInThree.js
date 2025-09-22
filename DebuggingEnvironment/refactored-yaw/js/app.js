@@ -358,9 +358,11 @@ function paint(clearPlots) {
   updateHeaderLabels();
 }
 
+const FRAME_LOG_EVERY_N = 10;
+
 function logFrame(result) {
   if (!result) return;
-  if ((uiState.frameIndex % 1) !== 0) return;
+  if ((uiState.frameIndex % FRAME_LOG_EVERY_N) !== 0) return;
   const { snapshot, params, stage, dRem, dir } = computeDerived();
   const events = result.pieces.map(p => p.note).join('|') || '-';
   console.log(`[FRAME] t=${snapshot.t.toFixed(3)} x=${snapshot.x.toFixed(2)} v=${snapshot.v.toFixed(2)} aEff=${result.aEff.toFixed(2)} L=${params.L} dir=${dir} phase=${snapshot.phase} dRem=${dRem.toFixed(2)} events=${events}`);

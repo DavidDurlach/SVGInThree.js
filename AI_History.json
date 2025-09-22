@@ -1,0 +1,33 @@
+[
+  {
+    "timestamp": "2025-09-22T19:20:00Z",
+    "entry_type": "task",
+    "task": {
+      "request": "Refactor yaw sandbox to separate GUI and restore physics per spec",
+      "understanding": "GUI was fine but core controller lost analytic accel/toVmax; velocity overshot and braking happened too late"
+    },
+    "changes": {
+      "files_modified": [
+        "DebuggingEnvironment/refactored-yaw/js/sim/simulation.js",
+        "DebuggingEnvironment/refactored-yaw/js/app.js"
+      ],
+      "code_before": "Selector used bang-bang ±aCap with optional coast, no analytic shaping, toVmax missing",
+      "code_after": "Selector computes a_shape/â, D_need, decelDist; orchestrator handles toVmax, coast, and passes stage metadata; diagnostics aware of coast",
+      "notes": "Debug logging kept (`DEBUG_STAGES`) plus FRAME_LOG_EVERY_N throttle"
+    },
+    "outcome": {
+      "expected": "Motion respects vmax, coasts, and decelerates at correct runway distance",
+      "actual": "Analytic accel implemented; further validation pending user tests",
+      "side_effects": ["More detailed stage logging until DEBUG_STAGES disabled"]
+    },
+    "learnings": {
+      "forest_level": "Keep selector aligned with shaping law; separating GUI/logic makes these ports manageable",
+      "weeds_level": "Without D_need/decelDist, coast stage degenerates to near-zero accel",
+      "avoid_next_time": "When refactoring large files, port analytic math before micro tweaks"
+    },
+    "patterns": {
+      "recurring_issue": "Velocity overshoot reappears whenever analytic planner is skipped",
+      "design_smell": "Bang-bang fallback hides invariants; maintain shaping inputs explicitly"
+    }
+  }
+]
